@@ -13,6 +13,7 @@ from aiogram.types import Message
 load_dotenv()
 
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
+TELEGRAM_ADMIN_ID = os.getenv('TELEGRAM_ADMIN_ID')
 dp = Dispatcher()
 
 
@@ -43,6 +44,19 @@ async def command_handler(message: Message) -> None:
     Обработка базовой команды /start
     """
     await message.answer(f"Привет, {message.from_user.full_name}!")
+
+
+async def start_bot(bot: Bot):
+    """Функция, которая отправляет уведомление о старте бота."""
+    try:
+        await bot.send_message(
+            TELEGRAM_ADMIN_ID,
+            text='Бот запущен'
+        )
+    except HomeworkBotError as e:
+        logging.error(f"Ошибка бота: {str(e)}")
+
+dp.startup.register(start_bot)
 
 
 async def main() -> None:
