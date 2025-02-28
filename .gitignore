@@ -5,3 +5,5 @@ env
 /venv
 venv
 .vscode
+/coin_keeper_bot.log
+coin_keeper_bot.log
