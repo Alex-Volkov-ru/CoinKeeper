@@ -9,6 +9,9 @@ from aiogram.enums import ParseMode
 from aiogram.filters import CommandStart
 from aiogram.types import Message
 
+
+from utils.commands import set_commands
+
 # Загружаем переменные окружения
 load_dotenv()
 
@@ -73,7 +76,7 @@ async def main() -> None:
         token=TELEGRAM_TOKEN,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 
-    # And the run events dispatching
+    await set_commands(bot)
     await dp.start_polling(bot)
 
 
