@@ -6,26 +6,19 @@ from dotenv import load_dotenv
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
-from aiogram.filters import CommandStart
-from aiogram.types import Message
-
+from aiogram.filters import Command
 
 from utils.commands import set_commands
+from handlers.start import command_handler
+from utils.exceptions import HomeworkBotError
 
 # Загружаем переменные окружения
 load_dotenv()
 
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 TELEGRAM_ADMIN_ID = os.getenv('TELEGRAM_ADMIN_ID')
+
 dp = Dispatcher()
-
-
-class HomeworkBotError(Exception):
-    """Базовый класс ошибок бота."""
-
-
-class APIResponseError(HomeworkBotError):
-    """Ошибка при запросе к API."""
 
 
 def check_tokens():
@@ -41,14 +34,6 @@ def check_tokens():
     return True
 
 
-@dp.message(CommandStart())
-async def command_handler(message: Message) -> None:
-    """
-    Обработка базовой команды /start
-    """
-    await message.answer(f"Привет, {message.from_user.full_name}!")
-
-
 async def start_bot(bot: Bot):
     """Функция, которая отправляет уведомление о старте бота."""
     try:
@@ -60,14 +45,12 @@ async def start_bot(bot: Bot):
         logging.error(f"Ошибка бота: {str(e)}")
 
 dp.startup.register(start_bot)
+dp.message.register(command_handler, Command(commands='start'))
 
 
 async def main() -> None:
     """
     Основная асинхронная функция для запуска бота.
-
-    Создает экземпляр бота, указывает токен и параметры и запускает
-    процесс обработки событий с использованием start_polling.
     """
     if not check_tokens():
         exit()
@@ -79,12 +62,7 @@ async def main() -> None:
     await set_commands(bot)
     await dp.start_polling(bot)
 
-
 if __name__ == '__main__':
-    """
-    Главная точка входа в программу. Настроена логгировка, создается
-    основная асинхронная задача для запуска бота.
-    """
     try:
         logging.basicConfig(
             level=logging.INFO,
