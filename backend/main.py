@@ -6,10 +6,9 @@ from dotenv import load_dotenv
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
-from aiogram.filters import Command
 
 from utils.commands import set_commands
-from handlers.start import command_handler
+from handlers.start import router as start_router
 from utils.exceptions import HomeworkBotError
 
 # Загружаем переменные окружения
@@ -19,6 +18,7 @@ TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 TELEGRAM_ADMIN_ID = os.getenv('TELEGRAM_ADMIN_ID')
 
 dp = Dispatcher()
+dp.include_router(start_router)
 
 
 def check_tokens():
@@ -45,7 +45,6 @@ async def start_bot(bot: Bot):
         logging.error(f"Ошибка бота: {str(e)}")
 
 dp.startup.register(start_bot)
-dp.message.register(command_handler, Command(commands='start'))
 
 
 async def main() -> None:

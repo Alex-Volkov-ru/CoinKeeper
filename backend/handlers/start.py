@@ -1,16 +1,17 @@
 import logging
 
-from aiogram import Dispatcher
+from aiogram import Router
 from aiogram.filters import CommandStart
 from aiogram.types import Message
 from aiogram.exceptions import AiogramError
 
 from utils.exceptions import HomeworkBotError
+from keyboards.keyboards import main as kb
 
-dp = Dispatcher()
+router = Router()
 
 
-@dp.message(CommandStart())
+@router.message(CommandStart())
 async def command_handler(message: Message) -> None:
     """
     Обработка базовой команды /start
@@ -19,7 +20,10 @@ async def command_handler(message: Message) -> None:
         if not message.from_user:
             raise HomeworkBotError("Пользователь не найден.")
 
-        await message.answer(f"Привет, {message.from_user.full_name}!")
+        await message.answer(
+            f"Привет, {message.from_user.full_name}!",
+            reply_markup=kb
+        )
     except HomeworkBotError as e:
         await message.answer(f"Ошибка: {str(e)}")
     except Exception:
@@ -28,7 +32,7 @@ async def command_handler(message: Message) -> None:
         raise
 
 
-@dp.errors()
+@router.errors()
 async def error_handler(event: AiogramError):
     """
     Глобальный обработчик исключений для всех ошибок.
