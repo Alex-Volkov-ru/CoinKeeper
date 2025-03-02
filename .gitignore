@@ -7,3 +7,7 @@ venv
 .vscode
 /coin_keeper_bot.log
 coin_keeper_bot.log
+sql_app.sqbpro
+/sql_app.sqbpro
+/coinkeeper.db
+coinkeeper.db

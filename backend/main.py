@@ -10,6 +10,7 @@ from aiogram.enums import ParseMode
 from utils.commands import set_commands
 from handlers.start import router as start_router
 from utils.exceptions import HomeworkBotError
+from models.init_db import init_db
 
 # Загружаем переменные окружения
 load_dotenv()
@@ -54,6 +55,7 @@ async def main() -> None:
     if not check_tokens():
         exit()
 
+    init_db()
     bot = Bot(
         token=TELEGRAM_TOKEN,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML))
