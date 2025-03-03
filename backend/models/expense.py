@@ -10,7 +10,7 @@ class Expense(Base):
     __tablename__ = "expenses"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(BigInteger, ForeignKey("users.tg_id"))
+    user_id = Column(BigInteger, ForeignKey("users.id"))
     category_id = Column(Integer, ForeignKey("expense_categories.id"))
     amount = Column(DECIMAL)
     date = Column(Date)

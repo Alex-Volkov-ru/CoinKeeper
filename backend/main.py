@@ -9,8 +9,10 @@ from aiogram.enums import ParseMode
 
 from utils.commands import set_commands
 from handlers.start import router as start_router
+from handlers.register import router as register_router
 from utils.exceptions import HomeworkBotError
 from models.init_db import init_db
+from handlers.menu import router as menu_router
 
 # Загружаем переменные окружения
 load_dotenv()
@@ -20,7 +22,8 @@ TELEGRAM_ADMIN_ID = os.getenv('TELEGRAM_ADMIN_ID')
 
 dp = Dispatcher()
 dp.include_router(start_router)
-
+dp.include_router(register_router)
+dp.include_router(menu_router)
 
 def check_tokens():
     """Проверяет наличие всех необходимых токенов."""

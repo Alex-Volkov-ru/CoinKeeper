@@ -8,7 +8,7 @@ async def set_commands(bot: Bot) -> None:
 
     Команды:
     - /start: Запуск бота.
-    - /registration: Регистрация в приложении.
+    - /register: Регистрация в приложении.
     - /help: Помощь по работе с ботом.
     - /contact: Контактная информация.
     """
@@ -18,7 +18,7 @@ async def set_commands(bot: Bot) -> None:
             description='Запускаем Бота'
         ),
         BotCommand(
-            command='registration',
+            command='register',
             description='Регистрация в приложении'
         ),
         BotCommand(

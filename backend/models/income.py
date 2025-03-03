@@ -8,11 +8,15 @@ class Income(Base):
     __tablename__ = "incomes"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey('users.tg_id'))
+    user_id = Column(Integer, ForeignKey('users.id'))
     category_id = Column(Integer, ForeignKey('income_categories.id'))
     amount = Column(DECIMAL)
     date = Column(Date)
     description = Column(String)
 
     user = relationship("User", back_populates='incomes')
-    category = relationship("IncomeCategory", back_populates="incomes")
+    category = relationship("IncomeCategory", back_populates="incomes")  # Убедись, что здесь back_populates
+
+    def __repr__(self):
+        return f"<Income {self.id}, {self.amount}>"
+

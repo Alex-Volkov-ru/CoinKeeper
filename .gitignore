@@ -11,3 +11,5 @@ sql_app.sqbpro
 /sql_app.sqbpro
 /coinkeeper.db
 coinkeeper.db
+alembic.ini
+/alembic.ini
