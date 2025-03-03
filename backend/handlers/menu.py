@@ -8,7 +8,7 @@ from aiogram.fsm.context import FSMContext
 
 from models.database import get_db
 from models.user import User
-from keyboards.keyboards import main, registered_main
+from keyboards.keyboards import main, registered_main, transaction_menu
 from handlers.register import RegistrationStates
 
 
@@ -84,3 +84,23 @@ async def profile_handler(message: Message, bot: Bot):
             "❌ Вы не зарегистрированы! Нажмите 'Регистрация'.", 
             reply_markup=main
         )
+
+@router.message(lambda message: message.text == "Добавить транзакцию")
+async def add_transaction_handler(message: Message, bot: Bot):
+    """Обработчик нажатия на 'Добавить транзакцию'"""
+    text = "Выберите тип транзакции:"
+    await bot.send_message(
+        message.from_user.id, 
+        text, 
+        reply_markup=transaction_menu
+    )
+
+# Обработчик кнопки "⬅ Назад"
+@router.message(lambda message: message.text == "⬅ Назад")
+async def back_to_main_menu(message: Message, bot: Bot):
+    """Возвращает пользователя в главное меню"""
+    await bot.send_message(
+        message.from_user.id, 
+        "Вы вернулись в главное меню", 
+        reply_markup=registered_main
+    )
