@@ -13,7 +13,7 @@ from models.database import get_db
 from models.income import Income
 from models.categories import IncomeCategory
 from models.user import User
-from keyboards.keyboards import registered_main, get_income_categories_keyboard
+from keyboards.keyboards import registered_main, get_income_categories_keyboard, transaction_menu
 
 logger = logging.getLogger(__name__)
 
@@ -30,27 +30,28 @@ def get_days_keyboard():
     today = datetime.today()
     current_month = today.month
     current_year = today.year
-    days_in_month = calendar.monthrange(current_year, current_month)[1]  # Получаем количество дней в месяце
+    days_in_month = calendar.monthrange(current_year, current_month)[1]
     days = [str(day) for day in range(1, days_in_month + 1)]
 
-    # Группируем дни по три в каждой строке
     buttons = []
     row = []
     for day in days:
-        row.append(InlineKeyboardButton(text=day, callback_data=f"day_{day}"))
-        if len(row) == 3:  # После каждых трех кнопок добавляем строку
+        row.append(InlineKeyboardButton(text=day, callback_data=f"expense_day_{day}"))
+        if len(row) == 3:
             buttons.append(row)
             row = []
-    if row:  # Добавляем оставшиеся кнопки, если их меньше трех
+    if row:
         buttons.append(row)
+    
+    # Добавляем кнопку "Отмена"
+    buttons.append([InlineKeyboardButton(text="❌ Отмена", callback_data="back")])
 
-    # Возвращаем клавиатуру с кнопками
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 # ✅ 1. Начинаем процесс добавления дохода
 @router.message(lambda message: message.text == "Добавить доход")
 async def start_add_income(message: Message, state: FSMContext):
-    await message.answer("Введите сумму дохода:")
+    await message.answer("Введите сумму дохода:", reply_markup=transaction_menu)
     await state.set_state(IncomeStates.waiting_for_amount)
 
 # ✅ 2. Пользователь вводит сумму дохода
@@ -63,7 +64,6 @@ async def process_income_amount(message: Message, state: FSMContext):
 
         db = next(get_db())  # Получаем сессию базы данных
         categories_keyboard = get_income_categories_keyboard(db)
-
         await message.answer("Выберите категорию дохода:", reply_markup=categories_keyboard)
         await state.set_state(IncomeStates.waiting_for_category)
     except ValueError:
@@ -219,3 +219,9 @@ async def back_to_main_menu(callback_query: CallbackQuery):
     """Возвращаемся к главному меню"""
     await callback_query.message.answer("Вы вернулись в главное меню.", reply_markup=registered_main)
     await callback_query.message.delete()
+
+
+@router.message(lambda message: message.text == "❌ Отмена")
+async def cancel_expense(message: Message, state: FSMContext):
+    await state.clear()
+    await message.answer("🚫 Операция отменена.", reply_markup=registered_main)

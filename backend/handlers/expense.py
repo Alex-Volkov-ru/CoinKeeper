@@ -13,7 +13,7 @@ from models.database import get_db
 from models.expense import Expense
 from models.categories import ExpenseCategory
 from models.user import User
-from keyboards.keyboards import registered_main, get_expense_categories_keyboard
+from keyboards.keyboards import registered_main, get_expense_categories_keyboard, transaction_menu
 
 logger = logging.getLogger(__name__)
 
@@ -43,12 +43,16 @@ def get_days_keyboard():
             row = []
     if row:
         buttons.append(row)
+    
+    # Добавляем кнопку "Отмена"
+    buttons.append([InlineKeyboardButton(text="❌ Отмена", callback_data="back")])
+
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
 @router.message(lambda message: message.text == "Добавить расход")
 async def start_add_expense(message: Message, state: FSMContext):
-    await message.answer("Введите сумму расхода:")
+    await message.answer("Введите сумму расхода:", reply_markup=transaction_menu)
     await state.set_state(ExpenseStates.waiting_for_amount)
 
 
@@ -181,3 +185,8 @@ async def process_expense_description(message: Message, state: FSMContext):
 async def back_to_main_menu(callback_query: CallbackQuery):
     await callback_query.message.answer("Вы вернулись в главное меню.", reply_markup=registered_main)
     await callback_query.message.delete()
+
+@router.message(lambda message: message.text == "❌ Отмена")
+async def cancel_expense(message: Message, state: FSMContext):
+    await state.clear()
+    await message.answer("🚫 Операция отменена.", reply_markup=registered_main)

@@ -34,6 +34,7 @@ def get_income_categories_keyboard(db: Session):
     categories = db.query(IncomeCategory).all()
     buttons = [[InlineKeyboardButton(text=category.name, callback_data=f"category_{category.id}")] for category in categories]
     buttons.append([InlineKeyboardButton(text="⬅ Назад", callback_data="back")])
+    buttons.append([InlineKeyboardButton(text="❌ Отмена", callback_data="back")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 def get_expense_categories_keyboard(db):
@@ -44,5 +45,6 @@ def get_expense_categories_keyboard(db):
         for category in categories
     ]
     buttons.append([InlineKeyboardButton(text="⬅ Назад", callback_data="back")])
+    buttons.append([InlineKeyboardButton(text="❌ Отмена", callback_data="back")])
 
     return InlineKeyboardMarkup(inline_keyboard=buttons)
