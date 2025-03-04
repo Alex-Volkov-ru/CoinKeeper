@@ -36,7 +36,7 @@ def get_days_keyboard():
     buttons = []
     row = []
     for day in days:
-        row.append(InlineKeyboardButton(text=day, callback_data=f"expense_day_{day}"))
+        row.append(InlineKeyboardButton(text=day, callback_data=f"day_{day}"))
         if len(row) == 3:
             buttons.append(row)
             row = []

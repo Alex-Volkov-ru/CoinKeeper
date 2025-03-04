@@ -8,6 +8,8 @@ from models.database import get_db
 from models.user import User
 
 router = Router()
+# Глобальный словарь для хранения контекста (доходы или расходы)
+user_context = {}
 
 # Функция для получения пользователя
 def get_user_from_db(db, tg_id):
@@ -135,10 +137,29 @@ async def show_monthly_expenses(callback_query: CallbackQuery):
     else:
         await callback_query.message.answer("❌ Пользователь не найден.")
 
+# Обработчик для кнопки "Фильтр по датам (с и по)" для расходов
+@router.callback_query(lambda c: c.data == "date_filter_expenses")
+async def ask_for_expenses_date_range(callback_query: CallbackQuery):
+    user_id = callback_query.from_user.id
+    user_context[user_id] = "expenses"  # Сохраняем контекст "расходы"
+    await callback_query.message.answer("Введите диапазон дат для расходов в формате ДД.ММ.ГГГГ ДД.ММ.ГГГГ (например, 01.01.2023 31.01.2023):")
+
+# Обработчик для кнопки "Фильтр по датам (с и по)" для доходов
+@router.callback_query(lambda c: c.data == "date_filter_income")
+async def ask_for_income_date_range(callback_query: CallbackQuery):
+    user_id = callback_query.from_user.id
+    user_context[user_id] = "income"  # Сохраняем контекст "доходы"
+    await callback_query.message.answer("Введите диапазон дат для доходов в формате ДД.ММ.ГГГГ ДД.ММ.ГГГГ (например, 01.01.2023 31.01.2023):")
+
 # Обработчик для вывода статистики по диапазону дат (формат ДД.ММ.ГГГГ ДД.ММ.ГГГГ)
 @router.message(lambda message: " " in message.text)
 async def handle_date_range(message: Message):
     try:
+        user_id = message.from_user.id
+        if user_id not in user_context:
+            await message.answer("❌ Контекст не найден. Пожалуйста, выберите 'Фильтр по датам' снова.")
+            return
+
         # Разделяем строку на две части по пробелу
         date_range = message.text.strip()
         start_date_str, end_date_str = date_range.split()
@@ -147,24 +168,21 @@ async def handle_date_range(message: Message):
         start_date = datetime.strptime(start_date_str.strip(), "%d.%m.%Y").date()
         end_date = datetime.strptime(end_date_str.strip(), "%d.%m.%Y").date()
 
-        # Печать для отладки
-        print(f"Start Date: {start_date}, End Date: {end_date}")
-
         db = next(get_db())
-        user = get_user_from_db(db, message.from_user.id)
+        user = get_user_from_db(db, user_id)
         if user:
-            # Проверка для доходов
-            if "доходы" in message.text.lower():
+            # Проверка контекста (доходы или расходы)
+            if user_context[user_id] == "income":
                 filtered_income = get_income_in_date_range(user.id, start_date, end_date, db)
-                print(f"Filtered Income: {filtered_income}")  # Печать для отладки
-                await message.answer(f"💰 Доходы с {start_date} по {end_date}: \n{filtered_income} ₽")
-            # Проверка для расходов
-            elif "расходы" in message.text.lower():
+                await message.answer(f"💰 Доходы с {start_date.strftime('%d.%m.%Y')} по {end_date.strftime('%d.%m.%Y')}: \n{filtered_income} ₽")
+            elif user_context[user_id] == "expenses":
                 filtered_expenses = get_expenses_in_date_range(user.id, start_date, end_date, db)
-                print(f"Filtered Expenses: {filtered_expenses}")  # Печать для отладки
-                await message.answer(f"💸 Расходы с {start_date} по {end_date}: \n{filtered_expenses} ₽")
+                await message.answer(f"💸 Расходы с {start_date.strftime('%d.%m.%Y')} по {end_date.strftime('%d.%m.%Y')}: \n{filtered_expenses} ₽")
+            else:
+                await message.answer("❌ Неверный контекст.")
+            # Очищаем контекст после обработки
+            del user_context[user_id]
         else:
             await message.answer("❌ Пользователь не найден.")
     except ValueError:
         await message.answer("❌ Неверный формат даты. Пожалуйста, используйте формат ДД.ММ.ГГГГ ДД.ММ.ГГГГ.")
-

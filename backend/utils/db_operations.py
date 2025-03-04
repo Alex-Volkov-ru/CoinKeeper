@@ -42,14 +42,12 @@ def get_monthly_expenses(user_id: int, db: Session):
 def get_income_in_date_range(user_id: int, start_date: datetime, end_date: datetime, db: Session):
     result = db.query(func.sum(Income.amount)) \
         .filter(Income.user_id == user_id, Income.date >= start_date, Income.date <= end_date) \
-        .scalar() or 0
-    print(f"Income query result: {result}")  # Для отладки
-    return result
+        .scalar()
+    return result if result is not None else 0
 
 # Получить расходы за заданный диапазон дат
 def get_expenses_in_date_range(user_id: int, start_date: datetime, end_date: datetime, db: Session):
     result = db.query(func.sum(Expense.amount)) \
         .filter(Expense.user_id == user_id, Expense.date >= start_date, Expense.date <= end_date) \
-        .scalar() or 0
-    print(f"Expenses query result: {result}")  # Для отладки
-    return result
+        .scalar()
+    return result if result is not None else 0
