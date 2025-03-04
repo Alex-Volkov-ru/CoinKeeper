@@ -19,6 +19,15 @@ logger = logging.getLogger(__name__)
 
 
 class ExpenseStates(StatesGroup):
+    """
+    Класс состояний для добавления расхода.
+
+    Состояния:
+    - waiting_for_amount: Ожидание ввода суммы расхода.
+    - waiting_for_category: Ожидание выбора категории расхода.
+    - waiting_for_date: Ожидание ввода даты расхода.
+    - waiting_for_description: Ожидание ввода описания расхода.
+    """
     waiting_for_amount = State()
     waiting_for_category = State()
     waiting_for_date = State()
@@ -28,6 +37,11 @@ router = Router()
 
 
 def get_days_keyboard():
+    """
+    Создает inline-клавиатуру для выбора дня месяца.
+
+    :return: InlineKeyboardMarkup с кнопками дней текущего месяца и кнопкой "Отмена".
+    """
     today = datetime.today()
     current_month = today.month
     current_year = today.year
@@ -52,12 +66,24 @@ def get_days_keyboard():
 
 @router.message(lambda message: message.text == "Добавить расход")
 async def start_add_expense(message: Message, state: FSMContext):
+    """
+    Начинает процесс добавления расхода. Переводит пользователя в состояние ожидания ввода суммы.
+
+    :param message: Объект сообщения от пользователя.
+    :param state: Состояние FSM (Finite State Machine).
+    """
     await message.answer("Введите сумму расхода:", reply_markup=transaction_menu)
     await state.set_state(ExpenseStates.waiting_for_amount)
 
 
 @router.message(ExpenseStates.waiting_for_amount)
 async def process_expense_amount(message: Message, state: FSMContext):
+    """
+    Обрабатывает ввод суммы расхода. Сохраняет сумму и переводит пользователя к выбору категории.
+
+    :param message: Объект сообщения от пользователя.
+    :param state: Состояние FSM.
+    """
     try:
         amount = float(message.text)
         await state.update_data(amount=amount)
@@ -73,6 +99,12 @@ async def process_expense_amount(message: Message, state: FSMContext):
 
 @router.callback_query(lambda c: c.data.startswith('expense_category_'))
 async def process_expense_category_callback(callback_query: CallbackQuery, state: FSMContext):
+    """
+    Обрабатывает выбор категории расхода. Сохраняет категорию и переводит пользователя к выбору даты.
+
+    :param callback_query: Объект callback-запроса.
+    :param state: Состояние FSM.
+    """
     db = next(get_db())
     category_data = callback_query.data.split('_')[2]
 
@@ -103,6 +135,12 @@ async def process_expense_category_callback(callback_query: CallbackQuery, state
 
 @router.callback_query(lambda c: c.data.startswith('expense_day_'))
 async def process_day_callback(callback_query: CallbackQuery, state: FSMContext):
+    """
+    Обрабатывает выбор дня через inline-клавиатуру. Сохраняет дату и переводит пользователя к вводу описания.
+
+    :param callback_query: Объект callback-запроса.
+    :param state: Состояние FSM.
+    """
     try:
         day = int(callback_query.data.split('_')[2])
         today = datetime.today()
@@ -120,6 +158,12 @@ async def process_day_callback(callback_query: CallbackQuery, state: FSMContext)
 
 @router.message(ExpenseStates.waiting_for_date)
 async def process_manual_date_input(message: Message, state: FSMContext):
+    """
+    Обрабатывает ввод даты вручную. Сохраняет дату и переводит пользователя к вводу описания.
+
+    :param message: Объект сообщения от пользователя.
+    :param state: Состояние FSM.
+    """
     try:
         expense_date = datetime.strptime(message.text, "%d.%m.%Y").date()
         today = datetime.today()
@@ -138,6 +182,12 @@ async def process_manual_date_input(message: Message, state: FSMContext):
 
 @router.message(ExpenseStates.waiting_for_description)
 async def process_expense_description(message: Message, state: FSMContext):
+    """
+    Обрабатывает ввод описания расхода. Сохраняет описание и добавляет расход в базу данных.
+
+    :param message: Объект сообщения от пользователя.
+    :param state: Состояние FSM.
+    """
     try:
         description = message.text
         await state.update_data(description=description)
@@ -183,10 +233,21 @@ async def process_expense_description(message: Message, state: FSMContext):
 
 @router.callback_query(lambda c: c.data == "back")
 async def back_to_main_menu(callback_query: CallbackQuery):
+    """
+    Обрабатывает нажатие кнопки "Назад". Возвращает пользователя в главное меню.
+
+    :param callback_query: Объект callback-запроса.
+    """
     await callback_query.message.answer("Вы вернулись в главное меню.", reply_markup=registered_main)
     await callback_query.message.delete()
 
 @router.message(lambda message: message.text == "❌ Отмена")
 async def cancel_expense(message: Message, state: FSMContext):
+    """
+    Обрабатывает отмену операции. Очищает состояние FSM и возвращает пользователя в главное меню.
+
+    :param message: Объект сообщения от пользователя.
+    :param state: Состояние FSM.
+    """
     await state.clear()
     await message.answer("🚫 Операция отменена.", reply_markup=registered_main)

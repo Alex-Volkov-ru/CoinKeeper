@@ -40,6 +40,7 @@ async def about_handler(message: Message):
 # Обработчик нажатия на кнопку "Регистрация"
 @router.message(lambda message: message.text == "Регистрация")  # Фильтр для кнопки
 async def start_register(message: Message, state: FSMContext, bot: Bot):
+    """Обработчик кнопки Регистрации """
     db = next(get_db())
 
     # Проверяем, есть ли пользователь с таким tg_id
@@ -56,6 +57,7 @@ async def start_register(message: Message, state: FSMContext, bot: Bot):
 
 @router.message(lambda message: message.text == "Профиль")
 async def profile_handler(message: Message, bot: Bot):
+    """Обработчик кнопки Профиль """
     db = next(get_db())
 
     # Проверяем, зарегистрирован ли пользователь

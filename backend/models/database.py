@@ -32,6 +32,11 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # Функция для получения сессии
 def get_db():
+    """
+    Генератор сессии базы данных.
+
+    :yield: Сессия базы данных.
+    """
     db = SessionLocal()
     try:
         yield db

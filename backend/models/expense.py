@@ -7,6 +7,19 @@ from models.database import Base
 
 
 class Expense(Base):
+    """
+    Модель расходов.
+
+    Атрибуты:
+    - id: Уникальный идентификатор расхода.
+    - user_id: Идентификатор пользователя, связанного с расходом.
+    - category_id: Идентификатор категории расхода.
+    - amount: Сумма расхода.
+    - date: Дата расхода.
+    - description: Описание расхода.
+    - user: Связь с моделью User.
+    - category: Связь с моделью ExpenseCategory.
+    """
     __tablename__ = "expenses"
 
     id = Column(Integer, primary_key=True, index=True)

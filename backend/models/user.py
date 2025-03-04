@@ -7,6 +7,19 @@ from models.expense import Expense
 
 
 class User(Base):
+    """
+    Модель пользователя.
+
+    Атрибуты:
+    - id: Уникальный идентификатор пользователя.
+    - tg_id: Telegram ID пользователя.
+    - name: Имя пользователя.
+    - last_name: Фамилия пользователя.
+    - contact: Контактная информация пользователя.
+    - balance: Баланс пользователя.
+    - incomes: Связь с моделью Income (доходы).
+    - expenses: Связь с моделью Expense (расходы).
+    """
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)

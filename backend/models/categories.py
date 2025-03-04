@@ -5,6 +5,14 @@ from models.database import Base
 
 
 class IncomeCategory(Base):
+    """
+    Модель категории доходов.
+
+    Атрибуты:
+    - id: Уникальный идентификатор категории.
+    - name: Название категории.
+    - incomes: Связь с моделью Income (доходы).
+    """
     __tablename__ = 'income_categories'
 
     id = Column(Integer, primary_key=True, index=True)
@@ -18,6 +26,14 @@ class IncomeCategory(Base):
 
 
 class ExpenseCategory(Base):
+    """
+    Модель категории расходов.
+
+    Атрибуты:
+    - id: Уникальный идентификатор категории.
+    - name: Название категории.
+    - expenses: Связь с моделью Expense (расходы).
+    """
     __tablename__ = "expense_categories"
 
     id = Column(Integer, primary_key=True, index=True)

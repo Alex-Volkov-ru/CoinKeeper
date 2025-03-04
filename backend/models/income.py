@@ -5,6 +5,19 @@ from models.database import Base
 
 
 class Income(Base):
+    """
+    Модель доходов.
+
+    Атрибуты:
+    - id: Уникальный идентификатор дохода.
+    - user_id: Идентификатор пользователя, связанного с доходом.
+    - category_id: Идентификатор категории дохода.
+    - amount: Сумма дохода.
+    - date: Дата дохода.
+    - description: Описание дохода.
+    - user: Связь с моделью User.
+    - category: Связь с моделью IncomeCategory.
+    """
     __tablename__ = "incomes"
 
     id = Column(Integer, primary_key=True, index=True)

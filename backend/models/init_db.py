@@ -8,6 +8,11 @@ from models.categories import IncomeCategory, ExpenseCategory
 
 
 def check_tables():
+    """
+    Проверяет наличие таблиц в базе данных.
+
+    Выводит список всех таблиц в базе данных.
+    """
     inspector = inspect(engine)
     tables = inspector.get_table_names()
     print(f"Таблицы в базе данных: {tables}")
@@ -15,5 +20,8 @@ def check_tables():
 
 # Создаем все таблицы в базе данных
 def init_db():
+    """
+    Инициализирует базу данных, создавая все таблицы, определенные в моделях.
+    """
     from models.database import Base
     Base.metadata.create_all(bind=engine)

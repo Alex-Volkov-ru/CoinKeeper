@@ -18,15 +18,29 @@ from keyboards.keyboards import registered_main, get_income_categories_keyboard,
 logger = logging.getLogger(__name__)
 
 class IncomeStates(StatesGroup):
-    waiting_for_amount = State()           # Состояние для ввода суммы
-    waiting_for_category = State()         # Состояние для выбора категории
-    waiting_for_date = State()             # Состояние для ввода даты
-    waiting_for_description = State()      # Состояние для ввода описания
+    """
+    Класс состояний для добавления дохода.
+
+    Состояния:
+    - waiting_for_amount: Ожидание ввода суммы дохода.
+    - waiting_for_category: Ожидание выбора категории дохода.
+    - waiting_for_date: Ожидание ввода даты дохода.
+    - waiting_for_description: Ожидание ввода описания дохода.
+    """
+    waiting_for_amount = State()
+    waiting_for_category = State()
+    waiting_for_date = State()
+    waiting_for_description = State()
 
 router = Router()
 
 # Клавиатура для выбора дня (inline)
 def get_days_keyboard():
+    """
+    Создает inline-клавиатуру для выбора дня месяца.
+
+    :return: InlineKeyboardMarkup с кнопками дней текущего месяца и кнопкой "Отмена".
+    """
     today = datetime.today()
     current_month = today.month
     current_year = today.year
@@ -51,13 +65,24 @@ def get_days_keyboard():
 # ✅ 1. Начинаем процесс добавления дохода
 @router.message(lambda message: message.text == "Добавить доход")
 async def start_add_income(message: Message, state: FSMContext):
+    """
+    Начинает процесс добавления дохода. Переводит пользователя в состояние ожидания ввода суммы.
+
+    :param message: Объект сообщения от пользователя.
+    :param state: Состояние FSM (Finite State Machine).
+    """
     await message.answer("Введите сумму дохода:", reply_markup=transaction_menu)
     await state.set_state(IncomeStates.waiting_for_amount)
 
 # ✅ 2. Пользователь вводит сумму дохода
 @router.message(IncomeStates.waiting_for_amount)
 async def process_income_amount(message: Message, state: FSMContext):
-    """Сохраняем сумму дохода и предлагаем выбрать категорию"""
+    """
+    Обрабатывает ввод суммы дохода. Сохраняет сумму и переводит пользователя к выбору категории.
+
+    :param message: Объект сообщения от пользователя.
+    :param state: Состояние FSM.
+    """
     try:
         amount = float(message.text)
         await state.update_data(amount=amount)
@@ -73,7 +98,7 @@ async def process_income_amount(message: Message, state: FSMContext):
 # ✅ 3. Пользователь выбирает категорию из inline клавиатуры
 @router.callback_query(lambda c: c.data.startswith('category_'))
 async def process_income_category_callback(callback_query: CallbackQuery, state: FSMContext):
-    """Сохраняем категорию и переходим к выбору даты"""
+    """Обрабатывает выбор категории дохода. Сохраняет категорию и переводит пользователя к выбору даты."""
     try:
         db = next(get_db())  # Получаем сессию базы данных
         category_id = int(callback_query.data.split('_')[1])  # Извлекаем ID категории
@@ -109,7 +134,7 @@ async def process_income_category_callback(callback_query: CallbackQuery, state:
 # ✅ 4. Обработка выбора дня через inline клавиатуру
 @router.callback_query(lambda c: c.data.startswith('day_'))
 async def process_day_callback(callback_query: CallbackQuery, state: FSMContext):
-    """Обрабатываем выбор дня через inline клавиатуру"""
+    """Обрабатывает выбор дня через inline-клавиатуру. Сохраняет дату и переводит пользователя к вводу описания."""
     try:
         day = int(callback_query.data.split('_')[1])  # Извлекаем выбранный день
         today = datetime.today()
@@ -136,7 +161,7 @@ async def process_day_callback(callback_query: CallbackQuery, state: FSMContext)
 # ✅ 5. Ввод даты вручную
 @router.message(IncomeStates.waiting_for_date)
 async def process_manual_date_input(message: Message, state: FSMContext):
-    """Обрабатываем ввод даты вручную"""
+    """Обрабатывает ввод даты вручную. Сохраняет дату и переводит пользователя к вводу описания."""
     try:
         # Преобразуем введенную дату в объект datetime
         income_date = datetime.strptime(message.text, "%d.%m.%Y").date()
@@ -159,7 +184,7 @@ async def process_manual_date_input(message: Message, state: FSMContext):
 # ✅ 6. Ввод описания
 @router.message(IncomeStates.waiting_for_description)
 async def process_income_description(message: Message, state: FSMContext):
-    """Сохраняем описание и добавляем доход в базу"""
+    """Обрабатывает ввод описания дохода. Сохраняет описание и добавляет доход в базу данных."""
     try:
         description = message.text
         await state.update_data(description=description)
@@ -216,12 +241,15 @@ async def process_income_description(message: Message, state: FSMContext):
 # Обработчик для кнопки "Назад" (если нужно реализовать логику возврата)
 @router.callback_query(lambda c: c.data == "back")
 async def back_to_main_menu(callback_query: CallbackQuery):
-    """Возвращаемся к главному меню"""
+    """Обрабатывает нажатие кнопки "Назад". Возвращает пользователя в главное меню."""
     await callback_query.message.answer("Вы вернулись в главное меню.", reply_markup=registered_main)
     await callback_query.message.delete()
 
 
 @router.message(lambda message: message.text == "❌ Отмена")
 async def cancel_expense(message: Message, state: FSMContext):
+    """
+    Обрабатывает отмену операции. Очищает состояние FSM и возвращает пользователя в главное меню.
+    """
     await state.clear()
     await message.answer("🚫 Операция отменена.", reply_markup=registered_main)
