@@ -18,3 +18,6 @@ class Expense(Base):
 
     user = relationship("User", back_populates="expenses")
     category = relationship("ExpenseCategory", back_populates="expenses")
+
+    def __repr__(self):
+        return f"<Expense {self.id}, {self.amount}>"

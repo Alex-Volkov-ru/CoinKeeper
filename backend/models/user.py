@@ -1,6 +1,4 @@
 from sqlalchemy import Column, String, BigInteger, DECIMAL, Integer
-
-
 from sqlalchemy.orm import relationship
 
 from models.database import Base

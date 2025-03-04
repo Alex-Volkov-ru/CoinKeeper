@@ -1,4 +1,5 @@
 import logging
+
 from decimal import Decimal
 from aiogram.fsm.state import State, StatesGroup
 from datetime import datetime
@@ -11,8 +12,11 @@ from models.database import get_db
 from models.income import Income
 from models.categories import IncomeCategory
 from models.user import User
-from keyboards.keyboards import registered_main
+from keyboards.keyboards import registered_main, get_income_categories_keyboard
+import calendar
 
+
+logger = logging.getLogger(__name__)
 
 class IncomeStates(StatesGroup):
     waiting_for_amount = State()           # Состояние для ввода суммы
@@ -24,21 +28,32 @@ class IncomeStates(StatesGroup):
 router = Router()
 
 
-# Клавиатура для выбора категории дохода (inline)
-def get_income_categories_keyboard(db: Session):
-    categories = db.query(IncomeCategory).all()
-    buttons = [
-        [InlineKeyboardButton(text=category.name, callback_data=f"category_{category.id}")]
-        for category in categories
-    ]
-    buttons.append([InlineKeyboardButton(text="⬅ Назад", callback_data="back")])
+# Клавиатура для выбора дня (inline)
+def get_days_keyboard():
+    today = datetime.today()
+    current_month = today.month
+    current_year = today.year
+    days_in_month = calendar.monthrange(current_year, current_month)[1]  # Получаем количество дней в месяце
+    days = [str(day) for day in range(1, days_in_month + 1)]
+
+    # Группируем дни по три в каждой строке
+    buttons = []
+    row = []
+    for day in days:
+        row.append(InlineKeyboardButton(text=day, callback_data=f"day_{day}"))
+        if len(row) == 3:  # После каждых трех кнопок добавляем строку
+            buttons.append(row)
+            row = []
+    if row:  # Добавляем оставшиеся кнопки, если их меньше трех
+        buttons.append(row)
+
+    # Возвращаем клавиатуру с кнопками
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
 # ✅ 1. Начинаем процесс добавления дохода
 @router.message(lambda message: message.text == "Добавить доход")
 async def start_add_income(message: Message, state: FSMContext):
-    """Запрашивает сумму дохода"""
     await message.answer("Введите сумму дохода:")
     await state.set_state(IncomeStates.waiting_for_amount)
 
@@ -66,10 +81,14 @@ async def process_income_category_callback(callback_query: CallbackQuery, state:
     """Сохраняем категорию и переходим к выбору даты"""
     db = next(get_db())  # Получаем сессию базы данных
     category_id = int(callback_query.data.split('_')[1])  # Извлекаем ID категории
+    
+    logger.info(f"Выбранный ID категории дохода: {category_id}")
+    
     category = db.query(IncomeCategory).filter(IncomeCategory.id == category_id).first()
 
     if not category:
-        await callback_query.message.answer("❌ Такая категория не найдена. Попробуйте снова.")
+        logger.error(f"Категория с ID {category_id} не найдена.")
+        await callback_query.message.answer("❌ Такая категория в доходах не найдена. Попробуйте снова.")
         return
 
     user = db.query(User).filter(User.tg_id == callback_query.from_user.id).first()
@@ -84,21 +103,43 @@ async def process_income_category_callback(callback_query: CallbackQuery, state:
     # Сохраняем категорию в состояние
     await state.update_data(category=category.name)
 
-    # Переход к вводу даты
-    await callback_query.message.answer("Введите дату дохода в формате ДД.ММ.ГГГГ (например, 25.03.2025):")
+    # Предлагаем выбрать день
+    await callback_query.message.answer("Выберите день месяца или введите его вручную:", reply_markup=get_days_keyboard())
     await state.set_state(IncomeStates.waiting_for_date)
 
     # Удаляем сообщение о клавиатуре
     await callback_query.message.delete()
 
 
+# ✅ 4. Обработка выбора дня через inline клавиатуру
+@router.callback_query(lambda c: c.data.startswith('day_'))
+async def process_day_callback(callback_query: CallbackQuery, state: FSMContext):
+    """Обрабатываем выбор дня через inline клавиатуру"""
+    day = int(callback_query.data.split('_')[1])  # Извлекаем выбранный день
+    today = datetime.today()
+    
+    # Формируем полную дату
+    income_date = today.replace(day=day).date()
+    
+    # Сохраняем дату в состояние
+    await state.update_data(date=income_date)
 
-# ✅ 4. Ввод даты
+    # Удаляем клавиатуру с датами
+    await callback_query.message.edit_reply_markup(reply_markup=None)
+
+    # Подтверждение выбора дня
+    await callback_query.message.answer(f"Вы выбрали {day} число.")
+
+    # Переходим к вводу описания
+    await callback_query.message.answer("Введите описание дохода (например, 'Зарплата за январь'):")
+    await state.set_state(IncomeStates.waiting_for_description)
+
+# ✅ 5. Ввод даты вручную
 @router.message(IncomeStates.waiting_for_date)
-async def process_income_date(message: Message, state: FSMContext):
-    """Сохраняем дату и предлагаем ввести описание"""
+async def process_manual_date_input(message: Message, state: FSMContext):
+    """Обрабатываем ввод даты вручную"""
     try:
-        # Попробуем преобразовать строку в дату
+        # Преобразуем введенную дату в объект datetime
         income_date = datetime.strptime(message.text, "%d.%m.%Y").date()
 
         # Проверка, что дата входит в текущий месяц
@@ -109,14 +150,15 @@ async def process_income_date(message: Message, state: FSMContext):
 
         await state.update_data(date=income_date)
 
-        # Переход к вводу описания
+        # Переходим к вводу описания
         await message.answer("Введите описание дохода (например, 'Зарплата за январь'):")
         await state.set_state(IncomeStates.waiting_for_description)
+
     except ValueError:
         await message.answer("❌ Ошибка! Введите дату в формате ДД.ММ.ГГГГ.")
 
 
-# ✅ 5. Ввод описания
+# ✅ 6. Ввод описания
 @router.message(IncomeStates.waiting_for_description)
 async def process_income_description(message: Message, state: FSMContext):
     """Сохраняем описание и добавляем доход в базу"""
@@ -126,7 +168,12 @@ async def process_income_description(message: Message, state: FSMContext):
     data = await state.get_data()
     amount = data["amount"]
     category_name = data["category"]  # Теперь категорию можно извлечь
-    income_date = data["date"]
+
+    # Проверяем наличие даты в состоянии
+    if "date" not in data:
+        income_date = datetime.today().date()  # Используем текущую дату по умолчанию
+    else:
+        income_date = data["date"]
 
     # Получаем категорию по имени
     db = next(get_db())
