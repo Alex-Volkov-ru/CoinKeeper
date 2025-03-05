@@ -84,17 +84,18 @@ async def show_expenses_stats_menu(callback_query: CallbackQuery):
 # Обработчик для вывода статистики за день для доходов
 @router.callback_query(lambda c: c.data == "daily_income")
 async def show_daily_income(callback_query: CallbackQuery):
-    """
-    Обработчик кнопки "Доходы за день". Показывает доходы за текущий день.
-
-    :param callback_query: Объект callback-запроса.
-    """
+    """Обработчик кнопки "Доходы за день". Показывает доходы за текущий день по категориям."""
     db = next(get_db())
     user = get_user_from_db(db, callback_query.from_user.id)
     if user:
         today = datetime.today().date()
-        daily_income = get_daily_income(user.id, db)
-        await callback_query.message.answer(f"📅 Доходы за день ({today.strftime('%d.%m.%Y')}): \n{daily_income} ₽")
+        total_income, category_incomes = get_daily_income(user.id, db)
+        
+        income_message = f"📅 Доходы за день ({today.strftime('%d.%m.%Y')}):\n{total_income}₽\n\n"
+        for category, amount in category_incomes.items():
+            income_message += f'📌 "{category}" {amount}₽\n'
+
+        await callback_query.message.answer(income_message)
     else:
         await callback_query.message.answer("❌ Пользователь не найден.")
 
@@ -110,12 +111,18 @@ async def show_weekly_income(callback_query: CallbackQuery):
     user = get_user_from_db(db, callback_query.from_user.id)
     if user:
         today = datetime.today().date()
-        start_of_week = today - timedelta(days=today.weekday())  # Начало недели
-        end_of_week = start_of_week + timedelta(days=6)  # Конец недели
-        weekly_income = get_weekly_income(user.id, db)
-        await callback_query.message.answer(f"📅 Доходы за неделю ({start_of_week.strftime('%d.%m.%Y')} - {end_of_week.strftime('%d.%m.%Y')}): \n{weekly_income} ₽")
+        start_of_week = today - timedelta(days=today.weekday())
+        end_of_week = start_of_week + timedelta(days=6)
+        total_income, category_incomes = get_weekly_income(user.id, db)
+        
+        income_message = f"📅 Доходы за неделю ({start_of_week.strftime('%d.%m.%Y')} - {end_of_week.strftime('%d.%m.%Y')}):\n{total_income}₽\n\n"
+        for category, amount in category_incomes.items():
+            income_message += f'📌 "{category}" {amount}₽\n'
+        
+        await callback_query.message.answer(income_message)
     else:
         await callback_query.message.answer("❌ Пользователь не найден.")
+
 
 # Обработчик для вывода статистики за месяц для доходов
 @router.callback_query(lambda c: c.data == "monthly_income")
@@ -129,11 +136,15 @@ async def show_monthly_income(callback_query: CallbackQuery):
     user = get_user_from_db(db, callback_query.from_user.id)
     if user:
         today = datetime.today().date()
-        start_of_month = today.replace(day=1)  # Начало месяца
-        # Для последнего дня месяца
+        start_of_month = today.replace(day=1)
         end_of_month = (start_of_month.replace(month=today.month % 12 + 1, day=1) - timedelta(days=1))
-        monthly_income = get_monthly_income(user.id, db)
-        await callback_query.message.answer(f"📆 Доходы за месяц ({start_of_month.strftime('%d.%m.%Y')} - {end_of_month.strftime('%d.%m.%Y')}): \n{monthly_income} ₽")
+        total_income, category_incomes = get_monthly_income(user.id, db)
+        
+        income_message = f"📆 Доходы за месяц ({start_of_month.strftime('%d.%m.%Y')} - {end_of_month.strftime('%d.%m.%Y')}):\n{total_income}₽\n\n"
+        for category, amount in category_incomes.items():
+            income_message += f'📌 "{category}" {amount}₽\n'
+        
+        await callback_query.message.answer(income_message)
     else:
         await callback_query.message.answer("❌ Пользователь не найден.")
 
@@ -149,12 +160,26 @@ async def show_daily_expenses(callback_query: CallbackQuery):
     user = get_user_from_db(db, callback_query.from_user.id)
     if user:
         today = datetime.today().date()
-        daily_expenses = get_daily_expenses(user.id, db)
-        await callback_query.message.answer(f"💸 Расходы за день ({today.strftime('%d.%m.%Y')}): \n{daily_expenses} ₽")
+        total_expense, category_expense = get_daily_expenses(user.id, db)
+
+        expense_message = f"💸 Расходы за день ({today.strftime('%d.%m.%Y')}):\n{total_expense}₽\n\n"
+        
+        # Инициализируем строку для деталей расходов по категориям
+        expense_details = ""
+
+        # Собираем информацию по категориям
+        for category, amount in category_expense.items():
+            expense_details += f'📌 "{category}" {amount}₽\n'
+
+        # Добавляем детали расходов в основное сообщение
+        expense_message += expense_details
+
+        # Отправляем сообщение
+        await callback_query.message.answer(expense_message)
     else:
         await callback_query.message.answer("❌ Пользователь не найден.")
 
-# Обработчик для вывода статистики за неделю для расходов
+
 @router.callback_query(lambda c: c.data == "weekly_expenses")
 async def show_weekly_expenses(callback_query: CallbackQuery):
     """
@@ -165,15 +190,24 @@ async def show_weekly_expenses(callback_query: CallbackQuery):
     db = next(get_db())
     user = get_user_from_db(db, callback_query.from_user.id)
     if user:
+        total_expense, category_expense = get_weekly_expenses(user.id, db)
+
         today = datetime.today().date()
         start_of_week = today - timedelta(days=today.weekday())  # Начало недели
         end_of_week = start_of_week + timedelta(days=6)  # Конец недели
-        weekly_expenses = get_weekly_expenses(user.id, db)
-        await callback_query.message.answer(f"📅 Расходы за неделю ({start_of_week.strftime('%d.%m.%Y')} - {end_of_week.strftime('%d.%m.%Y')}): \n{weekly_expenses} ₽")
+
+        # Формируем сообщение
+        expense_message = f"📅 Расходы за неделю ({start_of_week.strftime('%d.%m.%Y')} - {end_of_week.strftime('%d.%m.%Y')}):\n{total_expense}₽\n\n"
+        expense_details = ""
+        for category, amount in category_expense.items():
+            expense_details += f'📌 "{category}" {amount}₽\n'
+
+        expense_message += expense_details
+        await callback_query.message.answer(expense_message)
     else:
         await callback_query.message.answer("❌ Пользователь не найден.")
 
-# Обработчик для вывода статистики за месяц для расходов
+
 @router.callback_query(lambda c: c.data == "monthly_expenses")
 async def show_monthly_expenses(callback_query: CallbackQuery):
     """
@@ -184,14 +218,24 @@ async def show_monthly_expenses(callback_query: CallbackQuery):
     db = next(get_db())
     user = get_user_from_db(db, callback_query.from_user.id)
     if user:
+        total_expense, category_expense = get_monthly_expenses(user.id, db)
+
         today = datetime.today().date()
         start_of_month = today.replace(day=1)  # Начало месяца
         # Для последнего дня месяца
         end_of_month = (start_of_month.replace(month=today.month % 12 + 1, day=1) - timedelta(days=1))
-        monthly_expenses = get_monthly_expenses(user.id, db)
-        await callback_query.message.answer(f"📆 Расходы за месяц ({start_of_month.strftime('%d.%m.%Y')} - {end_of_month.strftime('%d.%m.%Y')}): \n{monthly_expenses} ₽")
+
+        # Формируем сообщение
+        expense_message = f"📆 Расходы за месяц ({start_of_month.strftime('%d.%m.%Y')} - {end_of_month.strftime('%d.%m.%Y')}):\n{total_expense}₽\n\n"
+        expense_details = ""
+        for category, amount in category_expense.items():
+            expense_details += f'📌 "{category}" {amount}₽\n'
+
+        expense_message += expense_details
+        await callback_query.message.answer(expense_message)
     else:
         await callback_query.message.answer("❌ Пользователь не найден.")
+
 
 # Обработчик для кнопки "Фильтр по датам (с и по)" для расходов
 @router.callback_query(lambda c: c.data == "date_filter_expenses")
