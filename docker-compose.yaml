@@ -1,4 +1,30 @@
-# services:
-#   backend:
-#     image: telebot-backend
-#     env_file: .env
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    container_name: coinkeeper_postgres
+    restart: always
+    env_file: .env
+    ports:
+      - "5432:5432"  # Если хочешь подключаться к БД извне
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $POSTGRES_USER"]
+      interval: 10s
+      retries: 5
+      timeout: 5s
+
+  backend:
+    image: coinkeeper_backend  # Используем уже загруженный образ
+    container_name: coinkeeper_backend
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: always
+    command: ["sh", "-c", "sleep 5 && python main.py"]
+
+volumes:
+  postgres_data:
