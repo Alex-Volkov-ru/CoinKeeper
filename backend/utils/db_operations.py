@@ -132,21 +132,35 @@ def get_monthly_expenses(user_id: int, db: Session):
         return 0, {}
 
 def get_income_in_date_range(user_id: int, start_date: datetime, end_date: datetime, db: Session):
-    """Получает сумму доходов пользователя за заданный диапазон дат."""
+    """Получает сумму доходов пользователя за заданный диапазон дат с разделением по категориям."""
     try:
-        result = db.query(func.sum(Income.amount)).filter(
-            Income.user_id == user_id, Income.date >= start_date, Income.date <= end_date).scalar()
-        return result if result is not None else 0
+        incomes = db.query(IncomeCategory.name, func.sum(Income.amount)) \
+            .join(Income.category) \
+            .filter(Income.user_id == user_id, Income.date >= start_date, Income.date <= end_date) \
+            .group_by(IncomeCategory.name) \
+            .all()
+
+        total_income = sum(amount for _, amount in incomes)
+        category_income = {category: amount for category, amount in incomes}
+
+        return total_income, category_income
     except Exception as e:
         logger.error(f"Ошибка при получении дохода за период {start_date} - {end_date}: {e}")
-        return 0
+        return 0, {}
 
 def get_expenses_in_date_range(user_id: int, start_date: datetime, end_date: datetime, db: Session):
-    """Получает сумму расходов пользователя за заданный диапазон дат."""
+    """Получает сумму расходов пользователя за заданный диапазон дат с разделением по категориям."""
     try:
-        result = db.query(func.sum(Expense.amount)).filter(
-            Expense.user_id == user_id, Expense.date >= start_date, Expense.date <= end_date).scalar()
-        return result if result is not None else 0
+        expenses = db.query(ExpenseCategory.name, func.sum(Expense.amount)) \
+            .join(Expense.category) \
+            .filter(Expense.user_id == user_id, Expense.date >= start_date, Expense.date <= end_date) \
+            .group_by(ExpenseCategory.name) \
+            .all()
+
+        total_expense = sum(amount for _, amount in expenses)
+        category_expense = {category: amount for category, amount in expenses}
+
+        return total_expense, category_expense
     except Exception as e:
         logger.error(f"Ошибка при получении расходов за период {start_date} - {end_date}: {e}")
-        return 0
+        return 0, {}

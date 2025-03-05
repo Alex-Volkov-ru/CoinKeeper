@@ -242,8 +242,6 @@ async def show_monthly_expenses(callback_query: CallbackQuery):
 async def ask_for_expenses_date_range(callback_query: CallbackQuery):
     """
     Обработчик кнопки "Фильтр по датам (с и по)" для расходов. Запрашивает у пользователя ввод диапазона дат.
-
-    :param callback_query: Объект callback-запроса.
     """
     user_id = callback_query.from_user.id
     user_context[user_id] = "expenses"  # Сохраняем контекст "расходы"
@@ -254,8 +252,6 @@ async def ask_for_expenses_date_range(callback_query: CallbackQuery):
 async def ask_for_income_date_range(callback_query: CallbackQuery):
     """
     Обработчик кнопки "Фильтр по датам (с и по)" для доходов. Запрашивает у пользователя ввод диапазона дат.
-
-    :param callback_query: Объект callback-запроса.
     """
     user_id = callback_query.from_user.id
     user_context[user_id] = "income"  # Сохраняем контекст "доходы"
@@ -266,8 +262,6 @@ async def ask_for_income_date_range(callback_query: CallbackQuery):
 async def handle_date_range(message: Message):
     """
     Обработчик ввода диапазона дат. Выводит статистику по доходам или расходам за указанный период.
-
-    :param message: Объект сообщения от пользователя.
     """
     try:
         user_id = message.from_user.id
@@ -288,11 +282,25 @@ async def handle_date_range(message: Message):
         if user:
             # Проверка контекста (доходы или расходы)
             if user_context[user_id] == "income":
-                filtered_income = get_income_in_date_range(user.id, start_date, end_date, db)
-                await message.answer(f"💰 Доходы с {start_date.strftime('%d.%m.%Y')} по {end_date.strftime('%d.%m.%Y')}: \n{filtered_income} ₽")
+                total_income, category_income = get_income_in_date_range(user.id, start_date, end_date, db)
+                # Формируем сообщение
+                income_message = f"💰 Доходы с {start_date.strftime('%d.%m.%Y')} по {end_date.strftime('%d.%m.%Y')}: \n{total_income} ₽\n\n"
+                income_details = ""
+                for category, amount in category_income.items():
+                    income_details += f'📌 "{category}" {amount}₽\n'
+
+                income_message += income_details
+                await message.answer(income_message)
             elif user_context[user_id] == "expenses":
-                filtered_expenses = get_expenses_in_date_range(user.id, start_date, end_date, db)
-                await message.answer(f"💸 Расходы с {start_date.strftime('%d.%m.%Y')} по {end_date.strftime('%d.%m.%Y')}: \n{filtered_expenses} ₽")
+                total_expense, category_expense = get_expenses_in_date_range(user.id, start_date, end_date, db)
+                # Формируем сообщение
+                expense_message = f"💸 Расходы с {start_date.strftime('%d.%m.%Y')} по {end_date.strftime('%d.%m.%Y')}: \n{total_expense} ₽\n\n"
+                expense_details = ""
+                for category, amount in category_expense.items():
+                    expense_details += f'📌 "{category}" {amount}₽\n'
+
+                expense_message += expense_details
+                await message.answer(expense_message)
             else:
                 await message.answer("❌ Неверный контекст.")
             # Очищаем контекст после обработки
