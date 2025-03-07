@@ -96,7 +96,7 @@ async def show_expenses_stats_menu(callback_query: CallbackQuery):
     )
     await callback_query.message.answer("Выберите, что вы хотите посмотреть по расходам:", reply_markup=expenses_stats_inline_keyboard)
 
-# Обработчик для вывода статистики за день для доходов
+
 @router.callback_query(lambda c: c.data == "daily_income")
 async def show_daily_income(callback_query: CallbackQuery):
     """Обработчик кнопки "Доходы за день". Показывает доходы за текущий день по категориям и деталям."""
@@ -244,90 +244,146 @@ async def show_monthly_income(callback_query: CallbackQuery):
 
 @router.callback_query(lambda c: c.data == "daily_expenses")
 async def show_daily_expenses(callback_query: CallbackQuery):
-    """
-    Обработчик кнопки "Расходы за день". Показывает расходы за текущий день.
+    """Обработчик кнопки "Расходы за день". Показывает расходы за текущий день по категориям и деталям."""
+    try:
+        with next(get_db()) as db:
+            user = get_user_from_db(db, callback_query.from_user.id)
+            if not user:
+                await callback_query.message.answer("❌ Пользователь не найден.")
+                return
 
-    :param callback_query: Объект callback-запроса.
-    """
-    db = next(get_db())
-    user = get_user_from_db(db, callback_query.from_user.id)
-    if user:
-        today = datetime.today().date()
-        total_expense, category_expense = get_daily_expenses(user.id, db)
+            today = datetime.today().date()
+            total_expense, category_expenses, detailed_expenses = get_daily_expenses(user.id, db)
 
-        expense_message = f"💸 Расходы за день ({today.strftime('%d.%m.%Y')}):\n{total_expense}₽\n\n"
-        
-        # Инициализируем строку для деталей расходов по категориям
-        expense_details = ""
+            if total_expense == 0:
+                await callback_query.message.answer("💸 Сегодня у вас нет расходов.")
+                return
 
-        # Собираем информацию по категориям
-        for category, amount in category_expense.items():
-            expense_details += f'📌 "{category}" {amount}₽\n'
+            # Заголовок с общей суммой (экранируем для MarkdownV2)
+            expense_message = f"📅 \\*Расходы за день\\* \\({escape_markdown_v2(today.strftime('%d.%m.%Y'))}\\):\n💸 {escape_markdown_v2(str(total_expense))}₽\n\n"
+            
+            # Список категорий с общей суммой (экранируем для MarkdownV2)
+            for category, amount in category_expenses.items():
+                expense_message += f'📌 \\*{escape_markdown_v2(category)}\\*: {escape_markdown_v2(str(amount))}₽\n'
 
-        # Добавляем детали расходов в основное сообщение
-        expense_message += expense_details
+            # Формируем таблицу для детальной информации (без экранирования, так как это код)
+            if detailed_expenses:
+                headers = ["Дата", "Категория", "Описание", "Сумма"]
+                table_data = [
+                    [
+                        date.strftime("%d.%m.%Y"),  # Дата без экранирования
+                        category,                  # Категория без экранирования
+                        description,               # Описание без экранирования
+                        f"{amount:.2f}₽"          # Сумма без экранирования
+                    ]
+                    for date, category, description, amount in detailed_expenses
+                ]
+                # Формируем таблицу
+                table = tabulate(table_data, headers, tablefmt="grid")
+                expense_message += f"\n📋 \\*Детальная информация:\\*\n```\n{table}\n```"
 
-        # Отправляем сообщение
-        await callback_query.message.answer(expense_message)
-    else:
-        await callback_query.message.answer("❌ Пользователь не найден.")
-
+            await callback_query.message.answer(expense_message, parse_mode="MarkdownV2")
+    except Exception as e:
+        logger.error(f"Ошибка при обработке расходов за день для пользователя {callback_query.from_user.id}: {e}")
+        await callback_query.message.answer("❌ Произошла ошибка при обработке запроса.")
 
 @router.callback_query(lambda c: c.data == "weekly_expenses")
 async def show_weekly_expenses(callback_query: CallbackQuery):
-    """
-    Обработчик кнопки "Расходы за неделю". Показывает расходы за текущую неделю.
+    """Обработчик кнопки "Расходы за неделю". Показывает расходы за текущую неделю по категориям и деталям."""
+    try:
+        with next(get_db()) as db:
+            user = get_user_from_db(db, callback_query.from_user.id)
+            if not user:
+                await callback_query.message.answer("❌ Пользователь не найден.")
+                return
 
-    :param callback_query: Объект callback-запроса.
-    """
-    db = next(get_db())
-    user = get_user_from_db(db, callback_query.from_user.id)
-    if user:
-        total_expense, category_expense = get_weekly_expenses(user.id, db)
+            today = datetime.today().date()
+            start_of_week = today - timedelta(days=today.weekday())
+            end_of_week = start_of_week + timedelta(days=6)
 
-        today = datetime.today().date()
-        start_of_week = today - timedelta(days=today.weekday())  # Начало недели
-        end_of_week = start_of_week + timedelta(days=6)  # Конец недели
+            total_expense, category_expenses, detailed_expenses = get_weekly_expenses(user.id, db)
 
-        # Формируем сообщение
-        expense_message = f"📅 Расходы за неделю ({start_of_week.strftime('%d.%m.%Y')} - {end_of_week.strftime('%d.%m.%Y')}):\n{total_expense}₽\n\n"
-        expense_details = ""
-        for category, amount in category_expense.items():
-            expense_details += f'📌 "{category}" {amount}₽\n'
+            if total_expense == 0:
+                await callback_query.message.answer("💸 За эту неделю у вас нет расходов.")
+                return
 
-        expense_message += expense_details
-        await callback_query.message.answer(expense_message)
-    else:
-        await callback_query.message.answer("❌ Пользователь не найден.")
+            # Заголовок с общей суммой (экранируем для MarkdownV2)
+            expense_message = f"📅 \\*Расходы за неделю\\* \\({escape_markdown_v2(start_of_week.strftime('%d.%m.%Y'))} \\- {escape_markdown_v2(end_of_week.strftime('%d.%m.%Y'))}\\):\n💸 {escape_markdown_v2(str(total_expense))}₽\n\n"
+            
+            # Список категорий с общей суммой (экранируем для MarkdownV2)
+            for category, amount in category_expenses.items():
+                expense_message += f'📌 \\*{escape_markdown_v2(category)}\\*: {escape_markdown_v2(str(amount))}₽\n'
+
+            # Формируем таблицу для детальной информации (без экранирования, так как это код)
+            if detailed_expenses:
+                headers = ["Дата", "Категория", "Описание", "Сумма"]
+                table_data = [
+                    [
+                        date.strftime("%d.%m.%Y"),  # Дата без экранирования
+                        category,                  # Категория без экранирования
+                        description,               # Описание без экранирования
+                        f"{amount:.2f}₽"          # Сумма без экранирования
+                    ]
+                    for date, category, description, amount in detailed_expenses
+                ]
+                # Формируем таблицу
+                table = tabulate(table_data, headers, tablefmt="grid")
+                expense_message += f"\n📋 \\*Детальная информация:\\*\n```\n{table}\n```"
+
+            await callback_query.message.answer(expense_message, parse_mode="MarkdownV2")
+    except Exception as e:
+        logger.error(f"Ошибка при обработке расходов за неделю для пользователя {callback_query.from_user.id}: {e}")
+        await callback_query.message.answer("❌ Произошла ошибка при обработке запроса.")
+
 
 
 @router.callback_query(lambda c: c.data == "monthly_expenses")
 async def show_monthly_expenses(callback_query: CallbackQuery):
-    """
-    Обработчик кнопки "Расходы за месяц". Показывает расходы за текущий месяц.
+    """Обработчик кнопки "Расходы за месяц". Показывает детальную статистику расходов за текущий месяц."""
+    try:
+        with next(get_db()) as db:
+            user = get_user_from_db(db, callback_query.from_user.id)
+            if not user:
+                await callback_query.message.answer("❌ Пользователь не найден.")
+                return
 
-    :param callback_query: Объект callback-запроса.
-    """
-    db = next(get_db())
-    user = get_user_from_db(db, callback_query.from_user.id)
-    if user:
-        total_expense, category_expense = get_monthly_expenses(user.id, db)
+            today = datetime.today().date()
+            start_of_month = today.replace(day=1)
+            end_of_month = (start_of_month.replace(month=today.month % 12 + 1, day=1) - timedelta(days=1))
 
-        today = datetime.today().date()
-        start_of_month = today.replace(day=1)  # Начало месяца
-        # Для последнего дня месяца
-        end_of_month = (start_of_month.replace(month=today.month % 12 + 1, day=1) - timedelta(days=1))
+            total_expense, category_expenses, detailed_expenses = get_monthly_expenses(user.id, db)
 
-        # Формируем сообщение
-        expense_message = f"📆 Расходы за месяц ({start_of_month.strftime('%d.%m.%Y')} - {end_of_month.strftime('%d.%m.%Y')}):\n{total_expense}₽\n\n"
-        expense_details = ""
-        for category, amount in category_expense.items():
-            expense_details += f'📌 "{category}" {amount}₽\n'
+            if total_expense == 0:
+                await callback_query.message.answer("💸 В этом месяце у вас нет расходов.")
+                return
 
-        expense_message += expense_details
-        await callback_query.message.answer(expense_message)
-    else:
-        await callback_query.message.answer("❌ Пользователь не найден.")
+            # Заголовок с общей суммой (экранируем для MarkdownV2)
+            expense_message = f"📆 \\*Расходы за месяц\\* \\({escape_markdown_v2(start_of_month.strftime('%d.%m.%Y'))} \\- {escape_markdown_v2(end_of_month.strftime('%d.%m.%Y'))}\\):\n💸 {escape_markdown_v2(str(total_expense))}₽\n\n"
+
+            # Список категорий с общей суммой (экранируем для MarkdownV2)
+            for category, amount in category_expenses.items():
+                expense_message += f'📌 \\*{escape_markdown_v2(category)}\\*: {escape_markdown_v2(str(amount))}₽\n'
+
+            # Формируем таблицу для детальной информации (без экранирования, так как это код)
+            if detailed_expenses:
+                headers = ["Дата", "Категория", "Описание", "Сумма"]
+                table_data = [
+                    [
+                        date.strftime("%d.%m.%Y"),  # Дата без экранирования
+                        category,                  # Категория без экранирования
+                        description,               # Описание без экранирования
+                        f"{amount:.2f}₽"          # Сумма без экранирования
+                    ]
+                    for date, category, description, amount in detailed_expenses
+                ]
+                # Формируем таблицу
+                table = tabulate(table_data, headers, tablefmt="grid")
+                expense_message += f"\n📋 \\*Детальная информация:\\*\n```\n{table}\n```"
+
+            await callback_query.message.answer(expense_message, parse_mode="MarkdownV2")
+    except Exception as e:
+        logger.error(f"Ошибка при обработке расходов за месяц для пользователя {callback_query.from_user.id}: {e}")
+        await callback_query.message.answer("❌ Произошла ошибка при обработке запроса.")
 
 
 # Обработчик для кнопки "Фильтр по датам (с и по)" для расходов

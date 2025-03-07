@@ -39,24 +39,30 @@ def get_daily_income(user_id: int, db: Session):
 
 
 def get_daily_expenses(user_id: int, db: Session):
-    """Получает сумму расходов пользователя за текущий день."""
+    """Получает сумму расходов пользователя за текущий день с разбивкой по категориям и детальными данными."""
     try:
         today = datetime.today().date()
 
-        # Используем связь через категорию
-        incomes = db.query(ExpenseCategory.name, func.sum(Expense.amount)) \
-            .join(Expense.category) \
+        # Группировка по категориям
+        expenses_grouped = db.query(ExpenseCategory.name, func.sum(Expense.amount)) \
+            .join(ExpenseCategory, Expense.category_id == ExpenseCategory.id) \
             .filter(Expense.user_id == user_id, Expense.date == today) \
             .group_by(ExpenseCategory.name) \
             .all()
 
-        total_expense = sum(amount for _, amount in incomes)
-        category_expense = {category: amount for category, amount in incomes}
+        total_expense = sum(amount for _, amount in expenses_grouped) if expenses_grouped else 0
+        category_expenses = {category: amount for category, amount in expenses_grouped} if expenses_grouped else {}
 
-        return total_expense, category_expense
+        # Детальный список расходов за день
+        detailed_expenses = db.query(Expense.date, ExpenseCategory.name, Expense.description, Expense.amount) \
+            .join(ExpenseCategory, Expense.category_id == ExpenseCategory.id) \
+            .filter(Expense.user_id == user_id, Expense.date == today) \
+            .all()
+
+        return total_expense, category_expenses, detailed_expenses
     except Exception as e:
-        logger.error(f"Ошибка при получении дневного дохода: {e}")
-        return 0, {}
+        logger.error(f"Ошибка при получении дневных расходов: {e}")
+        return 0, {}, []
 
 def get_weekly_income(user_id: int, db: Session):
     """Получает сумму доходов пользователя за текущую неделю с разбивкой по категориям и детальными данными."""
@@ -89,25 +95,31 @@ def get_weekly_income(user_id: int, db: Session):
 
 
 def get_weekly_expenses(user_id: int, db: Session):
-    """Получает сумму расходов пользователя за текущую неделю с разделением по категориям."""
+    """Получает сумму расходов пользователя за текущую неделю с разбивкой по категориям и детальными данными."""
     try:
         today = datetime.today().date()
         start_of_week = today - timedelta(days=today.weekday())
 
-        # Используем связь через категорию
-        expenses = db.query(ExpenseCategory.name, func.sum(Expense.amount)) \
-            .join(Expense.category) \
+        # Группировка по категориям
+        expenses_grouped = db.query(ExpenseCategory.name, func.sum(Expense.amount)) \
+            .join(ExpenseCategory, Expense.category_id == ExpenseCategory.id) \
             .filter(Expense.user_id == user_id, Expense.date >= start_of_week) \
             .group_by(ExpenseCategory.name) \
             .all()
 
-        total_expense = sum(amount for _, amount in expenses)
-        category_expense = {category: amount for category, amount in expenses}
+        total_expense = sum(amount for _, amount in expenses_grouped) if expenses_grouped else 0
+        category_expenses = {category: amount for category, amount in expenses_grouped} if expenses_grouped else {}
 
-        return total_expense, category_expense
+        # Детальный список расходов за неделю
+        detailed_expenses = db.query(Expense.date, ExpenseCategory.name, Expense.description, Expense.amount) \
+            .join(ExpenseCategory, Expense.category_id == ExpenseCategory.id) \
+            .filter(Expense.user_id == user_id, Expense.date >= start_of_week) \
+            .all()
+
+        return total_expense, category_expenses, detailed_expenses
     except Exception as e:
         logger.error(f"Ошибка при получении недельных расходов: {e}")
-        return 0, {}
+        return 0, {}, []
 
 def get_monthly_income(user_id: int, db: Session):
     """Получает полную статистику доходов пользователя за текущий месяц (сумму по категориям и детальную информацию)."""
@@ -139,25 +151,31 @@ def get_monthly_income(user_id: int, db: Session):
         return 0, {}, []
 
 def get_monthly_expenses(user_id: int, db: Session):
-    """Получает сумму расходов пользователя за текущий месяц с разделением по категориям."""
+    """Получает сумму расходов пользователя за текущий месяц с разбивкой по категориям и детальными данными."""
     try:
         today = datetime.today().date()
         start_of_month = today.replace(day=1)
 
-        # Используем связь через категорию
-        expenses = db.query(ExpenseCategory.name, func.sum(Expense.amount)) \
-            .join(Expense.category) \
+        # Группировка по категориям
+        expenses_grouped = db.query(ExpenseCategory.name, func.sum(Expense.amount)) \
+            .join(ExpenseCategory, Expense.category_id == ExpenseCategory.id) \
             .filter(Expense.user_id == user_id, Expense.date >= start_of_month) \
             .group_by(ExpenseCategory.name) \
             .all()
 
-        total_expense = sum(amount for _, amount in expenses)
-        category_expense = {category: amount for category, amount in expenses}
+        total_expense = sum(amount for _, amount in expenses_grouped) if expenses_grouped else 0
+        category_expenses = {category: amount for category, amount in expenses_grouped} if expenses_grouped else {}
 
-        return total_expense, category_expense
+        # Детальный список расходов за месяц
+        detailed_expenses = db.query(Expense.date, ExpenseCategory.name, Expense.description, Expense.amount) \
+            .join(ExpenseCategory, Expense.category_id == ExpenseCategory.id) \
+            .filter(Expense.user_id == user_id, Expense.date >= start_of_month) \
+            .all()
+
+        return total_expense, category_expenses, detailed_expenses
     except Exception as e:
         logger.error(f"Ошибка при получении месячных расходов: {e}")
-        return 0, {}
+        return 0, {}, []
 
 def get_income_in_date_range(user_id: int, start_date: datetime, end_date: datetime, db: Session):
     """Получает сумму доходов пользователя за заданный диапазон дат с разделением по категориям."""
