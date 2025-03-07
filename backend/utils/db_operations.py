@@ -178,35 +178,50 @@ def get_monthly_expenses(user_id: int, db: Session):
         return 0, {}, []
 
 def get_income_in_date_range(user_id: int, start_date: datetime, end_date: datetime, db: Session):
-    """Получает сумму доходов пользователя за заданный диапазон дат с разделением по категориям."""
+    """Получает сумму доходов пользователя за заданный диапазон дат с разделением по категориям и детальными данными."""
     try:
-        incomes = db.query(IncomeCategory.name, func.sum(Income.amount)) \
+        # Группировка по категориям
+        incomes_grouped = db.query(IncomeCategory.name, func.sum(Income.amount)) \
             .join(Income.category) \
             .filter(Income.user_id == user_id, Income.date >= start_date, Income.date <= end_date) \
             .group_by(IncomeCategory.name) \
             .all()
 
-        total_income = sum(amount for _, amount in incomes)
-        category_income = {category: amount for category, amount in incomes}
+        total_income = sum(amount for _, amount in incomes_grouped) if incomes_grouped else 0
+        category_income = {category: amount for category, amount in incomes_grouped} if incomes_grouped else {}
 
-        return total_income, category_income
+        # Детализированные данные по доходам за диапазон дат
+        detailed_incomes = db.query(Income.date, IncomeCategory.name, Income.description, Income.amount) \
+            .join(IncomeCategory, Income.category_id == IncomeCategory.id) \
+            .filter(Income.user_id == user_id, Income.date >= start_date, Income.date <= end_date) \
+            .all()
+
+        return total_income, category_income, detailed_incomes
     except Exception as e:
         logger.error(f"Ошибка при получении дохода за период {start_date} - {end_date}: {e}")
-        return 0, {}
+        return 0, {}, []
+
 
 def get_expenses_in_date_range(user_id: int, start_date: datetime, end_date: datetime, db: Session):
-    """Получает сумму расходов пользователя за заданный диапазон дат с разделением по категориям."""
+    """Получает сумму расходов пользователя за заданный диапазон дат с разделением по категориям и детальными данными."""
     try:
-        expenses = db.query(ExpenseCategory.name, func.sum(Expense.amount)) \
-            .join(Expense.category) \
+        # Группировка по категориям
+        expenses_grouped = db.query(ExpenseCategory.name, func.sum(Expense.amount)) \
+            .join(ExpenseCategory, Expense.category_id == ExpenseCategory.id) \
             .filter(Expense.user_id == user_id, Expense.date >= start_date, Expense.date <= end_date) \
             .group_by(ExpenseCategory.name) \
             .all()
 
-        total_expense = sum(amount for _, amount in expenses)
-        category_expense = {category: amount for category, amount in expenses}
+        total_expense = sum(amount for _, amount in expenses_grouped) if expenses_grouped else 0
+        category_expenses = {category: amount for category, amount in expenses_grouped} if expenses_grouped else {}
 
-        return total_expense, category_expense
+        # Детальный список расходов за диапазон дат
+        detailed_expenses = db.query(Expense.date, ExpenseCategory.name, Expense.description, Expense.amount) \
+            .join(ExpenseCategory, Expense.category_id == ExpenseCategory.id) \
+            .filter(Expense.user_id == user_id, Expense.date >= start_date, Expense.date <= end_date) \
+            .all()
+
+        return total_expense, category_expenses, detailed_expenses
     except Exception as e:
         logger.error(f"Ошибка при получении расходов за период {start_date} - {end_date}: {e}")
-        return 0, {}
+        return 0, {}, []

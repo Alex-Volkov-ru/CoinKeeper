@@ -406,7 +406,7 @@ async def ask_for_income_date_range(callback_query: CallbackQuery):
     user_context[user_id] = "income"  # Сохраняем контекст "доходы"
     await callback_query.message.answer("Введите диапазон дат для доходов в формате ДД.ММ.ГГГГ ДД.ММ.ГГГГ (например, 01.01.2023 31.01.2023):")
 
-# Обработчик для вывода статистики по диапазону дат (формат ДД.ММ.ГГГГ ДД.ММ.ГГГГ)
+
 @router.message(lambda message: " " in message.text)
 async def handle_date_range(message: Message):
     """
@@ -423,33 +423,68 @@ async def handle_date_range(message: Message):
         start_date_str, end_date_str = date_range.split()
 
         # Преобразуем строки в объекты datetime
-        start_date = datetime.strptime(start_date_str.strip(), "%d.%m.%Y").date()
-        end_date = datetime.strptime(end_date_str.strip(), "%d.%m.%Y").date()
+        try:
+            start_date = datetime.strptime(start_date_str.strip(), "%d.%m.%Y").date()
+            end_date = datetime.strptime(end_date_str.strip(), "%d.%m.%Y").date()
+        except ValueError:
+            await message.answer("❌ Неверный формат даты. Пожалуйста, используйте формат ДД.ММ.ГГГГ ДД.ММ.ГГГГ.")
+            return
 
         db = next(get_db())
         user = get_user_from_db(db, user_id)
         if user:
             # Проверка контекста (доходы или расходы)
             if user_context[user_id] == "income":
-                total_income, category_income = get_income_in_date_range(user.id, start_date, end_date, db)
+                total_income, category_income, detailed_incomes = get_income_in_date_range(user.id, start_date, end_date, db)
                 # Формируем сообщение
-                income_message = f"💰 Доходы с {start_date.strftime('%d.%m.%Y')} по {end_date.strftime('%d.%m.%Y')}: \n{total_income} ₽\n\n"
-                income_details = ""
+                income_message = f"📆 *Доходы с {escape_markdown_v2(start_date.strftime('%d.%m.%Y'))} по {escape_markdown_v2(end_date.strftime('%d.%m.%Y'))}:*\n💰 {escape_markdown_v2(str(total_income))} ₽\n\n"
+                # Список категорий с общей суммой
                 for category, amount in category_income.items():
-                    income_details += f'📌 "{category}" {amount}₽\n'
+                    income_message += f'📌 *{escape_markdown_v2(category)}*: {escape_markdown_v2(str(amount))}₽\n'
+                
+                # Формируем детальную таблицу
+                headers = ["Дата", "Категория", "Описание", "Сумма"]
+                table_data = [
+                    [
+                        date.strftime("%d.%m.%Y"),  # Дата без экранирования
+                        category,                  # Категория без экранирования
+                        description,               # Описание без экранирования
+                        f"{amount:.2f}₽"           # Сумма без экранирования
+                    ]
+                    for date, category, description, amount in detailed_incomes
+                ]
+                # Формируем таблицу
+                table = tabulate(table_data, headers, tablefmt="grid")
+                income_message += f"\n📋 *Детальная информация:*\n```\n{table}\n```"
 
-                income_message += income_details
-                await message.answer(income_message)
+                await message.answer(income_message, parse_mode="MarkdownV2")
+
             elif user_context[user_id] == "expenses":
-                total_expense, category_expense = get_expenses_in_date_range(user.id, start_date, end_date, db)
+                total_expense, category_expenses, detailed_expenses = get_expenses_in_date_range(user.id, start_date, end_date, db)
                 # Формируем сообщение
-                expense_message = f"💸 Расходы с {start_date.strftime('%d.%m.%Y')} по {end_date.strftime('%d.%m.%Y')}: \n{total_expense} ₽\n\n"
-                expense_details = ""
-                for category, amount in category_expense.items():
-                    expense_details += f'📌 "{category}" {amount}₽\n'
+                expense_message = f"📆 *Расходы с {escape_markdown_v2(start_date.strftime('%d.%m.%Y'))} по {escape_markdown_v2(end_date.strftime('%d.%m.%Y'))}:*\n💸 {escape_markdown_v2(str(total_expense))} ₽\n\n"
+                # Список категорий с общей суммой
+                for category, amount in category_expenses.items():
+                    expense_message += f'📌 *{escape_markdown_v2(category)}*: {escape_markdown_v2(str(amount))}₽\n'
 
-                expense_message += expense_details
-                await message.answer(expense_message)
+                # Формируем детальную таблицу
+                if detailed_expenses:
+                    headers = ["Дата", "Категория", "Описание", "Сумма"]
+                    table_data = [
+                        [
+                            date.strftime("%d.%m.%Y"),  # Дата
+                            category,                  # Категория
+                            description,               # Описание
+                            f"{amount:.2f}₽"           # Сумма без экранирования
+                        ]
+                        for date, category, description, amount in detailed_expenses
+                    ]
+                    # Формируем таблицу с улучшенным форматированием
+                    table = tabulate(table_data, headers, tablefmt="grid")
+                    expense_message += f"\n📋 *Детальная информация:*\n```\n{table}\n```"
+
+                await message.answer(expense_message, parse_mode="MarkdownV2")
+
             else:
                 await message.answer("❌ Неверный контекст.")
             # Очищаем контекст после обработки
