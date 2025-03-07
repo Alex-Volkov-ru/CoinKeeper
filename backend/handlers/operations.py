@@ -100,120 +100,148 @@ async def show_expenses_stats_menu(callback_query: CallbackQuery):
 @router.callback_query(lambda c: c.data == "daily_income")
 async def show_daily_income(callback_query: CallbackQuery):
     """Обработчик кнопки "Доходы за день". Показывает доходы за текущий день по категориям и деталям."""
-    with next(get_db()) as db:
-        user = get_user_from_db(db, callback_query.from_user.id)
-        if not user:
-            await callback_query.message.answer("❌ Пользователь не найден.")
-            return
+    try:
+        with next(get_db()) as db:
+            user = get_user_from_db(db, callback_query.from_user.id)
+            if not user:
+                await callback_query.message.answer("❌ Пользователь не найден.")
+                return
 
-        today = datetime.today().date()
-        total_income, category_incomes, detailed_incomes = get_daily_income(user.id, db)
+            today = datetime.today().date()
+            total_income, category_incomes, detailed_incomes = get_daily_income(user.id, db)
 
-        if total_income == 0:
-            await callback_query.message.answer("💰 Сегодня у вас нет доходов.")
-            return
+            if total_income == 0:
+                await callback_query.message.answer("💰 Сегодня у вас нет доходов.")
+                return
 
-        # Заголовок с общей суммой (экранируем для MarkdownV2)
-        income_message = f"📅 \\*Доходы за день\\* \\({escape_markdown_v2(today.strftime('%d.%m.%Y'))}\\):\n💰 {escape_markdown_v2(str(total_income))}₽\n\n"
-        
-        # Список категорий с общей суммой (экранируем для MarkdownV2)
-        for category, amount in category_incomes.items():
-            income_message += f'📌 \\*{escape_markdown_v2(category)}\\*: {escape_markdown_v2(str(amount))}₽\n'
+            # Заголовок с общей суммой (экранируем для MarkdownV2)
+            income_message = f"📅 \\*Доходы за день\\* \\({escape_markdown_v2(today.strftime('%d.%m.%Y'))}\\):\n💰 {escape_markdown_v2(str(total_income))}₽\n\n"
+            
+            # Список категорий с общей суммой (экранируем для MarkdownV2)
+            for category, amount in category_incomes.items():
+                income_message += f'📌 \\*{escape_markdown_v2(category)}\\*: {escape_markdown_v2(str(amount))}₽\n'
 
-        # Формируем таблицу для детальной информации (без экранирования, так как это код)
-        if detailed_incomes:
-            headers = ["Дата", "Категория", "Описание", "Сумма"]
-            table_data = [
-                [
-                    date.strftime("%d.%m.%Y"),  # Дата без экранирования
-                    category,                  # Категория без экранирования
-                    description,               # Описание без экранирования
-                    f"{amount:.2f}₽"          # Сумма без экранирования
+            # Формируем таблицу для детальной информации (без экранирования, так как это код)
+            if detailed_incomes:
+                headers = ["Дата", "Категория", "Описание", "Сумма"]
+                table_data = [
+                    [
+                        date.strftime("%d.%m.%Y"),  # Дата без экранирования
+                        category,                  # Категория без экранирования
+                        description,               # Описание без экранирования
+                        f"{amount:.2f}₽"          # Сумма без экранирования
+                    ]
+                    for date, category, description, amount in detailed_incomes
                 ]
-                for date, category, description, amount in detailed_incomes
-            ]
-            # Формируем таблицу
-            table = tabulate(table_data, headers, tablefmt="grid")
-            income_message += f"\n📋 \\*Детальная информация:\\*\n```\n{table}\n```"
+                # Формируем таблицу
+                table = tabulate(table_data, headers, tablefmt="grid")
+                income_message += f"\n📋 \\*Детальная информация:\\*\n```\n{table}\n```"
 
-        await callback_query.message.answer(income_message, parse_mode="MarkdownV2")
+            await callback_query.message.answer(income_message, parse_mode="MarkdownV2")
+    except Exception as e:
+        logger.error(f"Ошибка при обработке доходов за день для пользователя {callback_query.from_user.id}: {e}")
+        await callback_query.message.answer("❌ Произошла ошибка при обработке запроса.")
+
 
 # Обработчик для вывода статистики за неделю для доходов
 @router.callback_query(lambda c: c.data == "weekly_income")
 async def show_weekly_income(callback_query: CallbackQuery):
     """Обработчик кнопки "Доходы за неделю". Показывает доходы за текущую неделю по категориям и деталям."""
-    with next(get_db()) as db:
-        user = get_user_from_db(db, callback_query.from_user.id)
-        if not user:
-            await callback_query.message.answer("❌ Пользователь не найден.")
-            return
+    try:
+        with next(get_db()) as db:
+            user = get_user_from_db(db, callback_query.from_user.id)
+            if not user:
+                await callback_query.message.answer("❌ Пользователь не найден.")
+                return
 
-        today = datetime.today().date()
-        start_of_week = today - timedelta(days=today.weekday())
-        end_of_week = start_of_week + timedelta(days=6)
+            today = datetime.today().date()
+            start_of_week = today - timedelta(days=today.weekday())
+            end_of_week = start_of_week + timedelta(days=6)
 
-        total_income, category_incomes, detailed_incomes = get_weekly_income(user.id, db)
+            total_income, category_incomes, detailed_incomes = get_weekly_income(user.id, db)
 
-        if total_income == 0:
-            await callback_query.message.answer("💰 За эту неделю у вас нет доходов.")
-            return
+            if total_income == 0:
+                await callback_query.message.answer("💰 За эту неделю у вас нет доходов.")
+                return
 
-        # Заголовок с общей суммой
-        income_message = f"📅 Доходы за неделю ({start_of_week.strftime('%d.%m.%Y')} - {end_of_week.strftime('%d.%m.%Y')}):\n{total_income}₽\n\n"
+            # Заголовок с общей суммой (экранируем для MarkdownV2)
+            income_message = f"📅 \\*Доходы за неделю\\* \\({escape_markdown_v2(start_of_week.strftime('%d.%m.%Y'))} \\- {escape_markdown_v2(end_of_week.strftime('%d.%m.%Y'))}\\):\n💰 {escape_markdown_v2(str(total_income))}₽\n\n"
+            
+            # Список категорий с общей суммой (экранируем для MarkdownV2)
+            for category, amount in category_incomes.items():
+                income_message += f'📌 \\*{escape_markdown_v2(category)}\\*: {escape_markdown_v2(str(amount))}₽\n'
 
-        # Список категорий с общей суммой
-        for category, amount in category_incomes.items():
-            income_message += f'📌 "{category}" {amount}₽\n'
+            # Формируем таблицу для детальной информации (без экранирования, так как это код)
+            if detailed_incomes:
+                headers = ["Дата", "Категория", "Описание", "Сумма"]
+                table_data = [
+                    [
+                        date.strftime("%d.%m.%Y"),  # Дата без экранирования
+                        category,                  # Категория без экранирования
+                        description,               # Описание без экранирования
+                        f"{amount:.2f}₽"          # Сумма без экранирования
+                    ]
+                    for date, category, description, amount in detailed_incomes
+                ]
+                # Формируем таблицу
+                table = tabulate(table_data, headers, tablefmt="grid")
+                income_message += f"\n📋 \\*Детальная информация:\\*\n```\n{table}\n```"
 
-        income_message += "\n📋 **Детальная информация**:\n"
-        income_message += "Дата           Категория     Описание                Сумма\n"
-        income_message += "────────────────────────────────────────\n"
-
-        # Добавляем строки с деталями
-        for date, category, description, amount in detailed_incomes:
-            income_message += f"{date.strftime('%d.%m.%Y')} {category:<12} {description:<20} {amount}₽\n"
-
-        await callback_query.message.answer(f"```{income_message}```", parse_mode="MarkdownV2")
+            await callback_query.message.answer(income_message, parse_mode="MarkdownV2")
+    except Exception as e:
+        logger.error(f"Ошибка при обработке доходов за неделю для пользователя {callback_query.from_user.id}: {e}")
+        await callback_query.message.answer("❌ Произошла ошибка при обработке запроса.")
 
 
-# Обработчик для вывода статистики за месяц для доходов
 @router.callback_query(lambda c: c.data == "monthly_income")
 async def show_monthly_income(callback_query: CallbackQuery):
     """Обработчик кнопки "Доходы за месяц". Показывает детальную статистику доходов за текущий месяц."""
-    with next(get_db()) as db:
-        user = get_user_from_db(db, callback_query.from_user.id)
-        if not user:
-            await callback_query.message.answer("❌ Пользователь не найден.")
-            return
+    try:
+        with next(get_db()) as db:
+            user = get_user_from_db(db, callback_query.from_user.id)
+            if not user:
+                await callback_query.message.answer("❌ Пользователь не найден.")
+                return
 
-        today = datetime.today().date()
-        start_of_month = today.replace(day=1)
-        end_of_month = (start_of_month.replace(month=today.month % 12 + 1, day=1) - timedelta(days=1))
+            today = datetime.today().date()
+            start_of_month = today.replace(day=1)
+            end_of_month = (start_of_month.replace(month=today.month % 12 + 1, day=1) - timedelta(days=1))
 
-        total_income, category_incomes, detailed_incomes = get_monthly_income(user.id, db)
+            total_income, category_incomes, detailed_incomes = get_monthly_income(user.id, db)
 
-        if total_income == 0:
-            await callback_query.message.answer("💰 В этом месяце у вас нет доходов.")
-            return
+            if total_income == 0:
+                await callback_query.message.answer("💰 В этом месяце у вас нет доходов.")
+                return
 
-        # Заголовок с общей суммой
-        income_message = f"📆 Доходы за месяц ({start_of_month.strftime('%d.%m.%Y')} - {end_of_month.strftime('%d.%m.%Y')}):\n{total_income}₽\n\n"
+            # Заголовок с общей суммой (экранируем для MarkdownV2)
+            income_message = f"📆 \\*Доходы за месяц\\* \\({escape_markdown_v2(start_of_month.strftime('%d.%m.%Y'))} \\- {escape_markdown_v2(end_of_month.strftime('%d.%m.%Y'))}\\):\n💰 {escape_markdown_v2(str(total_income))}₽\n\n"
 
-        # Список категорий с общей суммой
-        for category, amount in category_incomes.items():
-            income_message += f'📌 "{category}" {amount}₽\n'
+            # Список категорий с общей суммой (экранируем для MarkdownV2)
+            for category, amount in category_incomes.items():
+                income_message += f'📌 \\*{escape_markdown_v2(category)}\\*: {escape_markdown_v2(str(amount))}₽\n'
 
-        income_message += "\n📋 **Детальная информация**:\n"
-        income_message += "Дата           Категория     Описание                Сумма\n"
-        income_message += "────────────────────────────────────────\n"
+            # Формируем таблицу для детальной информации (без экранирования, так как это код)
+            if detailed_incomes:
+                headers = ["Дата", "Категория", "Описание", "Сумма"]
+                table_data = [
+                    [
+                        date.strftime("%d.%m.%Y"),  # Дата без экранирования
+                        category,                  # Категория без экранирования
+                        description,               # Описание без экранирования
+                        f"{amount:.2f}₽"          # Сумма без экранирования
+                    ]
+                    for date, category, description, amount in detailed_incomes
+                ]
+                # Формируем таблицу
+                table = tabulate(table_data, headers, tablefmt="grid")
+                income_message += f"\n📋 \\*Детальная информация:\\*\n```\n{table}\n```"
 
-        # Добавляем строки с деталями
-        for date, category, description, amount in detailed_incomes:
-            income_message += f"{date.strftime('%d.%m.%Y')} {category:<12} {description:<20} {amount}₽\n"
+            await callback_query.message.answer(income_message, parse_mode="MarkdownV2")
+    except Exception as e:
+        logger.error(f"Ошибка при обработке доходов за месяц для пользователя {callback_query.from_user.id}: {e}")
+        await callback_query.message.answer("❌ Произошла ошибка при обработке запроса.")
 
-        await callback_query.message.answer(f"```{income_message}```", parse_mode="MarkdownV2")
 
-# Обработчик для вывода статистики за день для расходов
 @router.callback_query(lambda c: c.data == "daily_expenses")
 async def show_daily_expenses(callback_query: CallbackQuery):
     """
