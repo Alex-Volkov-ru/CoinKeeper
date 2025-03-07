@@ -33,13 +33,10 @@ def get_user_from_db(db, tg_id):
 def escape_markdown_v2(text: str) -> str:
     """Escapes special characters for proper rendering in MarkdownV2."""
     # Список символов, которые нужно экранировать
-    escape_chars = r'_*[\]()~`>#+-=|{}.!'
+    escape_chars = r'_*[]()~`>#+-=|{}.!'
 
-    # Экранируем все специальные символы, кроме скобок
+    # Экранируем все специальные символы
     text = re.sub(r'([{}])'.format(re.escape(escape_chars)), r'\\\1', text)
-
-    # Экранируем скобки отдельно
-    text = text.replace('(', r'\(').replace(')', r'\)')
 
     return text
 
@@ -101,45 +98,50 @@ async def show_expenses_stats_menu(callback_query: CallbackQuery):
 async def show_daily_income(callback_query: CallbackQuery):
     """Обработчик кнопки "Доходы за день". Показывает доходы за текущий день по категориям и деталям."""
     try:
+        # Получаем данные из базы данных
         with next(get_db()) as db:
             user = get_user_from_db(db, callback_query.from_user.id)
+
             if not user:
                 await callback_query.message.answer("❌ Пользователь не найден.")
                 return
 
             today = datetime.today().date()
-            total_income, category_incomes, detailed_incomes = get_daily_income(user.id, db)
 
+            # Получаем доходы
+            total_income, category_incomes, detailed_incomes = get_daily_income(user.id, db)
+            
             if total_income == 0:
                 await callback_query.message.answer("💰 Сегодня у вас нет доходов.")
                 return
 
-            # Заголовок с общей суммой (экранируем для MarkdownV2)
+            # Формируем сообщение с общими доходами
             income_message = f"📅 \\*Доходы за день\\* \\({escape_markdown_v2(today.strftime('%d.%m.%Y'))}\\):\n💰 {escape_markdown_v2(str(total_income))}₽\n\n"
-            
-            # Список категорий с общей суммой (экранируем для MarkdownV2)
+
+            # Формируем список доходов по категориям
             for category, amount in category_incomes.items():
                 income_message += f'📌 \\*{escape_markdown_v2(category)}\\*: {escape_markdown_v2(str(amount))}₽\n'
 
-            # Формируем таблицу для детальной информации (без экранирования, так как это код)
+            # Формируем таблицу с детальной информацией
             if detailed_incomes:
                 headers = ["Дата", "Категория", "Описание", "Сумма"]
                 table_data = [
                     [
-                        date.strftime("%d.%m.%Y"),  # Дата без экранирования
-                        category,                  # Категория без экранирования
-                        description,               # Описание без экранирования
-                        f"{amount:.2f}₽"          # Сумма без экранирования
+                        date.strftime("%d.%m.%Y"),
+                        escape_markdown_v2(category),
+                        escape_markdown_v2(description),
+                        f"{amount:.2f}₽"
                     ]
                     for date, category, description, amount in detailed_incomes
                 ]
-                # Формируем таблицу
+
                 table = tabulate(table_data, headers, tablefmt="grid")
                 income_message += f"\n📋 \\*Детальная информация:\\*\n```\n{table}\n```"
 
             await callback_query.message.answer(income_message, parse_mode="MarkdownV2")
+            
     except Exception as e:
-        logger.error(f"Ошибка при обработке доходов за день для пользователя {callback_query.from_user.id}: {e}")
+        logger.error(f"Ошибка при обработке доходов за день для пользователя {callback_query.from_user.id}: {e}", exc_info=True)
         await callback_query.message.answer("❌ Произошла ошибка при обработке запроса.")
 
 
@@ -246,46 +248,52 @@ async def show_monthly_income(callback_query: CallbackQuery):
 async def show_daily_expenses(callback_query: CallbackQuery):
     """Обработчик кнопки "Расходы за день". Показывает расходы за текущий день по категориям и деталям."""
     try:
+        # Получаем данные из базы данных
         with next(get_db()) as db:
             user = get_user_from_db(db, callback_query.from_user.id)
+
             if not user:
                 await callback_query.message.answer("❌ Пользователь не найден.")
                 return
 
             today = datetime.today().date()
-            total_expense, category_expenses, detailed_expenses = get_daily_expenses(user.id, db)
 
+            # Получаем расходы
+            total_expense, category_expenses, detailed_expenses = get_daily_expenses(user.id, db)
+            
             if total_expense == 0:
                 await callback_query.message.answer("💸 Сегодня у вас нет расходов.")
                 return
 
-            # Заголовок с общей суммой (экранируем для MarkdownV2)
+            # Формируем сообщение с общими расходами
             expense_message = f"📅 \\*Расходы за день\\* \\({escape_markdown_v2(today.strftime('%d.%m.%Y'))}\\):\n💸 {escape_markdown_v2(str(total_expense))}₽\n\n"
-            
-            # Список категорий с общей суммой (экранируем для MarkdownV2)
+
+            # Формируем список расходов по категориям
             for category, amount in category_expenses.items():
                 expense_message += f'📌 \\*{escape_markdown_v2(category)}\\*: {escape_markdown_v2(str(amount))}₽\n'
 
-            # Формируем таблицу для детальной информации (без экранирования, так как это код)
+            # Формируем таблицу с детальной информацией
             if detailed_expenses:
                 headers = ["Дата", "Категория", "Описание", "Сумма"]
                 table_data = [
                     [
-                        date.strftime("%d.%m.%Y"),  # Дата без экранирования
-                        category,                  # Категория без экранирования
-                        description,               # Описание без экранирования
-                        f"{amount:.2f}₽"          # Сумма без экранирования
+                        date.strftime("%d.%m.%Y"),
+                        escape_markdown_v2(category),
+                        escape_markdown_v2(description),
+                        f"{amount:.2f}₽"
                     ]
                     for date, category, description, amount in detailed_expenses
                 ]
-                # Формируем таблицу
+
                 table = tabulate(table_data, headers, tablefmt="grid")
                 expense_message += f"\n📋 \\*Детальная информация:\\*\n```\n{table}\n```"
 
             await callback_query.message.answer(expense_message, parse_mode="MarkdownV2")
+            
     except Exception as e:
-        logger.error(f"Ошибка при обработке расходов за день для пользователя {callback_query.from_user.id}: {e}")
+        logger.error(f"Ошибка при обработке расходов за день для пользователя {callback_query.from_user.id}: {e}", exc_info=True)
         await callback_query.message.answer("❌ Произошла ошибка при обработке запроса.")
+
 
 @router.callback_query(lambda c: c.data == "weekly_expenses")
 async def show_weekly_expenses(callback_query: CallbackQuery):
