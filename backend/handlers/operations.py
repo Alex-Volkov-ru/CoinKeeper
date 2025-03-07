@@ -1,8 +1,10 @@
+import re
 import logging
 
 from datetime import datetime, timedelta
 from aiogram import Router
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+from tabulate import tabulate
 
 from utils.db_operations import get_daily_income, get_weekly_income, get_monthly_income, get_income_in_date_range
 from utils.db_operations import get_daily_expenses, get_weekly_expenses, get_monthly_expenses, get_expenses_in_date_range
@@ -26,13 +28,26 @@ def get_user_from_db(db, tg_id):
     """
     return db.query(User).filter(User.tg_id == tg_id).first()
 
+
+# Функция для экранирования MarkdownV2
+def escape_markdown_v2(text: str) -> str:
+    """Escapes special characters for proper rendering in MarkdownV2."""
+    # Список символов, которые нужно экранировать
+    escape_chars = r'_*[\]()~`>#+-=|{}.!'
+
+    # Экранируем все специальные символы, кроме скобок
+    text = re.sub(r'([{}])'.format(re.escape(escape_chars)), r'\\\1', text)
+
+    # Экранируем скобки отдельно
+    text = text.replace('(', r'\(').replace(')', r'\)')
+
+    return text
+
 # Обработчик кнопки "Статистика"
 @router.message(lambda message: message.text == "Статистика")
 async def show_statistics_menu(message: Message):
     """
     Обработчик команды "Статистика". Показывает меню выбора статистики (доходы или расходы).
-
-    :param message: Объект сообщения от пользователя.
     """
     stats_inline_keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
@@ -98,22 +113,30 @@ async def show_daily_income(callback_query: CallbackQuery):
             await callback_query.message.answer("💰 Сегодня у вас нет доходов.")
             return
 
-        # Заголовок с общей суммой
-        income_message = f"📅 Доходы за день ({today.strftime('%d.%m.%Y')}):\n{total_income}₽\n\n"
-
-        # Список категорий с общей суммой
+        # Заголовок с общей суммой (экранируем для MarkdownV2)
+        income_message = f"📅 \\*Доходы за день\\* \\({escape_markdown_v2(today.strftime('%d.%m.%Y'))}\\):\n💰 {escape_markdown_v2(str(total_income))}₽\n\n"
+        
+        # Список категорий с общей суммой (экранируем для MarkdownV2)
         for category, amount in category_incomes.items():
-            income_message += f'📌 "{category}" {amount}₽\n'
+            income_message += f'📌 \\*{escape_markdown_v2(category)}\\*: {escape_markdown_v2(str(amount))}₽\n'
 
-        income_message += "\n📋 **Детальная информация**:\n"
-        income_message += "Дата           Категория     Описание                Сумма\n"
-        income_message += "────────────────────────────────────────\n"
+        # Формируем таблицу для детальной информации (без экранирования, так как это код)
+        if detailed_incomes:
+            headers = ["Дата", "Категория", "Описание", "Сумма"]
+            table_data = [
+                [
+                    date.strftime("%d.%m.%Y"),  # Дата без экранирования
+                    category,                  # Категория без экранирования
+                    description,               # Описание без экранирования
+                    f"{amount:.2f}₽"          # Сумма без экранирования
+                ]
+                for date, category, description, amount in detailed_incomes
+            ]
+            # Формируем таблицу
+            table = tabulate(table_data, headers, tablefmt="grid")
+            income_message += f"\n📋 \\*Детальная информация:\\*\n```\n{table}\n```"
 
-        # Добавляем строки с деталями
-        for date, category, description, amount in detailed_incomes:
-            income_message += f"{date.strftime('%d.%m.%Y')} {category:<12} {description:<20} {amount}₽\n"
-
-        await callback_query.message.answer(f"```{income_message}```", parse_mode="MarkdownV2")
+        await callback_query.message.answer(income_message, parse_mode="MarkdownV2")
 
 # Обработчик для вывода статистики за неделю для доходов
 @router.callback_query(lambda c: c.data == "weekly_income")
@@ -151,7 +174,6 @@ async def show_weekly_income(callback_query: CallbackQuery):
             income_message += f"{date.strftime('%d.%m.%Y')} {category:<12} {description:<20} {amount}₽\n"
 
         await callback_query.message.answer(f"```{income_message}```", parse_mode="MarkdownV2")
-
 
 
 # Обработчик для вывода статистики за месяц для доходов
