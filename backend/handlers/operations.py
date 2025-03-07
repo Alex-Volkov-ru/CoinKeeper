@@ -84,69 +84,112 @@ async def show_expenses_stats_menu(callback_query: CallbackQuery):
 # Обработчик для вывода статистики за день для доходов
 @router.callback_query(lambda c: c.data == "daily_income")
 async def show_daily_income(callback_query: CallbackQuery):
-    """Обработчик кнопки "Доходы за день". Показывает доходы за текущий день по категориям."""
-    db = next(get_db())
-    user = get_user_from_db(db, callback_query.from_user.id)
-    if user:
+    """Обработчик кнопки "Доходы за день". Показывает доходы за текущий день по категориям и деталям."""
+    with next(get_db()) as db:
+        user = get_user_from_db(db, callback_query.from_user.id)
+        if not user:
+            await callback_query.message.answer("❌ Пользователь не найден.")
+            return
+
         today = datetime.today().date()
-        total_income, category_incomes = get_daily_income(user.id, db)
-        
+        total_income, category_incomes, detailed_incomes = get_daily_income(user.id, db)
+
+        if total_income == 0:
+            await callback_query.message.answer("💰 Сегодня у вас нет доходов.")
+            return
+
+        # Заголовок с общей суммой
         income_message = f"📅 Доходы за день ({today.strftime('%d.%m.%Y')}):\n{total_income}₽\n\n"
+
+        # Список категорий с общей суммой
         for category, amount in category_incomes.items():
             income_message += f'📌 "{category}" {amount}₽\n'
 
-        await callback_query.message.answer(income_message)
-    else:
-        await callback_query.message.answer("❌ Пользователь не найден.")
+        income_message += "\n📋 **Детальная информация**:\n"
+        income_message += "Дата           Категория     Описание                Сумма\n"
+        income_message += "────────────────────────────────────────\n"
+
+        # Добавляем строки с деталями
+        for date, category, description, amount in detailed_incomes:
+            income_message += f"{date.strftime('%d.%m.%Y')} {category:<12} {description:<20} {amount}₽\n"
+
+        await callback_query.message.answer(f"```{income_message}```", parse_mode="MarkdownV2")
 
 # Обработчик для вывода статистики за неделю для доходов
 @router.callback_query(lambda c: c.data == "weekly_income")
 async def show_weekly_income(callback_query: CallbackQuery):
-    """
-    Обработчик кнопки "Доходы за неделю". Показывает доходы за текущую неделю.
+    """Обработчик кнопки "Доходы за неделю". Показывает доходы за текущую неделю по категориям и деталям."""
+    with next(get_db()) as db:
+        user = get_user_from_db(db, callback_query.from_user.id)
+        if not user:
+            await callback_query.message.answer("❌ Пользователь не найден.")
+            return
 
-    :param callback_query: Объект callback-запроса.
-    """
-    db = next(get_db())
-    user = get_user_from_db(db, callback_query.from_user.id)
-    if user:
         today = datetime.today().date()
         start_of_week = today - timedelta(days=today.weekday())
         end_of_week = start_of_week + timedelta(days=6)
-        total_income, category_incomes = get_weekly_income(user.id, db)
-        
+
+        total_income, category_incomes, detailed_incomes = get_weekly_income(user.id, db)
+
+        if total_income == 0:
+            await callback_query.message.answer("💰 За эту неделю у вас нет доходов.")
+            return
+
+        # Заголовок с общей суммой
         income_message = f"📅 Доходы за неделю ({start_of_week.strftime('%d.%m.%Y')} - {end_of_week.strftime('%d.%m.%Y')}):\n{total_income}₽\n\n"
+
+        # Список категорий с общей суммой
         for category, amount in category_incomes.items():
             income_message += f'📌 "{category}" {amount}₽\n'
-        
-        await callback_query.message.answer(income_message)
-    else:
-        await callback_query.message.answer("❌ Пользователь не найден.")
+
+        income_message += "\n📋 **Детальная информация**:\n"
+        income_message += "Дата           Категория     Описание                Сумма\n"
+        income_message += "────────────────────────────────────────\n"
+
+        # Добавляем строки с деталями
+        for date, category, description, amount in detailed_incomes:
+            income_message += f"{date.strftime('%d.%m.%Y')} {category:<12} {description:<20} {amount}₽\n"
+
+        await callback_query.message.answer(f"```{income_message}```", parse_mode="MarkdownV2")
+
 
 
 # Обработчик для вывода статистики за месяц для доходов
 @router.callback_query(lambda c: c.data == "monthly_income")
 async def show_monthly_income(callback_query: CallbackQuery):
-    """
-    Обработчик кнопки "Доходы за месяц". Показывает доходы за текущий месяц.
+    """Обработчик кнопки "Доходы за месяц". Показывает детальную статистику доходов за текущий месяц."""
+    with next(get_db()) as db:
+        user = get_user_from_db(db, callback_query.from_user.id)
+        if not user:
+            await callback_query.message.answer("❌ Пользователь не найден.")
+            return
 
-    :param callback_query: Объект callback-запроса.
-    """
-    db = next(get_db())
-    user = get_user_from_db(db, callback_query.from_user.id)
-    if user:
         today = datetime.today().date()
         start_of_month = today.replace(day=1)
         end_of_month = (start_of_month.replace(month=today.month % 12 + 1, day=1) - timedelta(days=1))
-        total_income, category_incomes = get_monthly_income(user.id, db)
-        
+
+        total_income, category_incomes, detailed_incomes = get_monthly_income(user.id, db)
+
+        if total_income == 0:
+            await callback_query.message.answer("💰 В этом месяце у вас нет доходов.")
+            return
+
+        # Заголовок с общей суммой
         income_message = f"📆 Доходы за месяц ({start_of_month.strftime('%d.%m.%Y')} - {end_of_month.strftime('%d.%m.%Y')}):\n{total_income}₽\n\n"
+
+        # Список категорий с общей суммой
         for category, amount in category_incomes.items():
             income_message += f'📌 "{category}" {amount}₽\n'
-        
-        await callback_query.message.answer(income_message)
-    else:
-        await callback_query.message.answer("❌ Пользователь не найден.")
+
+        income_message += "\n📋 **Детальная информация**:\n"
+        income_message += "Дата           Категория     Описание                Сумма\n"
+        income_message += "────────────────────────────────────────\n"
+
+        # Добавляем строки с деталями
+        for date, category, description, amount in detailed_incomes:
+            income_message += f"{date.strftime('%d.%m.%Y')} {category:<12} {description:<20} {amount}₽\n"
+
+        await callback_query.message.answer(f"```{income_message}```", parse_mode="MarkdownV2")
 
 # Обработчик для вывода статистики за день для расходов
 @router.callback_query(lambda c: c.data == "daily_expenses")

@@ -12,24 +12,31 @@ from models.categories import IncomeCategory, ExpenseCategory
 logger = logging.getLogger(__name__)
 
 def get_daily_income(user_id: int, db: Session):
-    """Получает сумму доходов пользователя за текущий день с разбивкой по категориям."""
+    """Получает сумму доходов пользователя за текущий день с разбивкой по категориям и детальными данными."""
     try:
         today = datetime.today().date()
 
-        # Используем связь через категорию
-        incomes = db.query(IncomeCategory.name, func.sum(Income.amount)) \
-            .join(Income.category) \
+        # Группировка по категориям
+        incomes_grouped = db.query(IncomeCategory.name, func.sum(Income.amount)) \
+            .join(IncomeCategory, Income.category_id == IncomeCategory.id) \
             .filter(Income.user_id == user_id, Income.date == today) \
             .group_by(IncomeCategory.name) \
             .all()
 
-        total_income = sum(amount for _, amount in incomes)
-        category_incomes = {category: amount for category, amount in incomes}
+        total_income = sum(amount for _, amount in incomes_grouped) if incomes_grouped else 0
+        category_incomes = {category: amount for category, amount in incomes_grouped} if incomes_grouped else {}
 
-        return total_income, category_incomes
+        # Детальный список доходов за день
+        detailed_incomes = db.query(Income.date, IncomeCategory.name, Income.description, Income.amount) \
+            .join(IncomeCategory, Income.category_id == IncomeCategory.id) \
+            .filter(Income.user_id == user_id, Income.date == today) \
+            .all()
+
+        return total_income, category_incomes, detailed_incomes
     except Exception as e:
         logger.error(f"Ошибка при получении дневного дохода: {e}")
-        return 0, {}
+        return 0, {}, []
+
 
 def get_daily_expenses(user_id: int, db: Session):
     """Получает сумму расходов пользователя за текущий день."""
@@ -52,23 +59,34 @@ def get_daily_expenses(user_id: int, db: Session):
         return 0, {}
 
 def get_weekly_income(user_id: int, db: Session):
-    """Получает сумму доходов пользователя за текущую неделю с разбивкой по категориям."""
+    """Получает сумму доходов пользователя за текущую неделю с разбивкой по категориям и детальными данными."""
     try:
         today = datetime.today().date()
-        start_of_week = today - timedelta(days=today.weekday())
-        incomes = db.query(IncomeCategory.name, func.sum(Income.amount)) \
-            .join(Income.category) \
-            .filter(Income.user_id == user_id, Income.date >= start_of_week) \
+        start_of_week = today - timedelta(days=today.weekday())  # Понедельник
+        end_of_week = start_of_week + timedelta(days=6)  # Воскресенье
+
+        # Группировка по категориям
+        incomes_grouped = db.query(IncomeCategory.name, func.sum(Income.amount)) \
+            .join(IncomeCategory, Income.category_id == IncomeCategory.id) \
+            .filter(Income.user_id == user_id, Income.date.between(start_of_week, end_of_week)) \
             .group_by(IncomeCategory.name) \
             .all()
-        
-        total_income = sum(amount for _, amount in incomes)
-        category_incomes = {category: amount for category, amount in incomes}
 
-        return total_income, category_incomes
+        total_income = sum(amount for _, amount in incomes_grouped) if incomes_grouped else 0
+        category_incomes = {category: amount for category, amount in incomes_grouped} if incomes_grouped else {}
+
+        # Детальный список доходов за неделю
+        detailed_incomes = db.query(Income.date, IncomeCategory.name, Income.description, Income.amount) \
+            .join(IncomeCategory, Income.category_id == IncomeCategory.id) \
+            .filter(Income.user_id == user_id, Income.date.between(start_of_week, end_of_week)) \
+            .order_by(Income.date) \
+            .all()
+
+        return total_income, category_incomes, detailed_incomes
     except Exception as e:
         logger.error(f"Ошибка при получении недельного дохода: {e}")
-        return 0, {}
+        return 0, {}, []
+
 
 def get_weekly_expenses(user_id: int, db: Session):
     """Получает сумму расходов пользователя за текущую неделю с разделением по категориям."""
@@ -92,23 +110,33 @@ def get_weekly_expenses(user_id: int, db: Session):
         return 0, {}
 
 def get_monthly_income(user_id: int, db: Session):
-    """Получает сумму доходов пользователя за текущий месяц с разбивкой по категориям."""
+    """Получает полную статистику доходов пользователя за текущий месяц (сумму по категориям и детальную информацию)."""
     try:
         today = datetime.today().date()
         start_of_month = today.replace(day=1)
-        incomes = db.query(IncomeCategory.name, func.sum(Income.amount)) \
-            .join(Income.category) \
-            .filter(Income.user_id == user_id, Income.date >= start_of_month) \
+        end_of_month = (start_of_month.replace(month=today.month % 12 + 1, day=1) - timedelta(days=1))
+
+        # Группировка по категориям
+        incomes_grouped = db.query(IncomeCategory.name, func.sum(Income.amount)) \
+            .join(IncomeCategory, Income.category_id == IncomeCategory.id) \
+            .filter(Income.user_id == user_id, Income.date.between(start_of_month, end_of_month)) \
             .group_by(IncomeCategory.name) \
             .all()
-        
-        total_income = sum(amount for _, amount in incomes)
-        category_incomes = {category: amount for category, amount in incomes}
 
-        return total_income, category_incomes
+        total_income = sum(amount for _, amount in incomes_grouped) if incomes_grouped else 0
+        category_incomes = {category: amount for category, amount in incomes_grouped} if incomes_grouped else {}
+
+        # Детальный список доходов за месяц
+        detailed_incomes = db.query(Income.date, IncomeCategory.name, Income.description, Income.amount) \
+            .join(IncomeCategory, Income.category_id == IncomeCategory.id) \
+            .filter(Income.user_id == user_id, Income.date.between(start_of_month, end_of_month)) \
+            .order_by(Income.date) \
+            .all()
+
+        return total_income, category_incomes, detailed_incomes
     except Exception as e:
         logger.error(f"Ошибка при получении месячного дохода: {e}")
-        return 0, {}
+        return 0, {}, []
 
 def get_monthly_expenses(user_id: int, db: Session):
     """Получает сумму расходов пользователя за текущий месяц с разделением по категориям."""
